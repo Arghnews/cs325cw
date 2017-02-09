@@ -10,6 +10,11 @@ def tokenize(code):
             "for","function","if","in","local","nil","not","or",
             "repeat","return","then","true","until","while"]
     keywords_regex = (r'|').join(word for word in keywords)
+
+    operators = ['\+','\-','\*','\/','\%','\^','\#','\==','\~=',
+            '\<=','\>=','\<','\>','\=','\(','\)','\{','\}','\[',
+            '\]','\;','\:','\,','\...','\..','\.',]
+    operators_regex = (r'|').join(word for word in operators)
     
     #inty = r'asd'
     #int2 = r'asdd'
@@ -19,6 +24,8 @@ def tokenize(code):
         ("Number", r'0[xX]([0-9a-fA-F]*)(\.[0-9a-fA-F]+)([pP]-?[0-9]+)?|0[xX]([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?|([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?|([0-9]*)(\.[0-9]+)([eE]-?[0-9]+)?' ),
         ("Name", r'[_a-zA-Z][_a-zA-Z0-9]*'), # should be before keyword
         ("Keyword", keywords_regex),
+        ("Operator", operators_regex),
+        ("String", r'\"[^\"]*\"|\'[^\']*\''),
         ("Newline", r'\n'),
         ("Empty", r' '),
         ("Error", r'.'), # Must be last
@@ -38,13 +45,16 @@ def tokenize(code):
         elif kind == 'Error':
             raise RuntimeError('%r unexpected on line %d' % (value, line_num))
         else:
-            #if kind == 'ID' and value in keywords:
+            if kind == "String" and value:
+                value = value[1:-1] # remove first and last chars
             column = mo.start() - line_start
             yield Token(kind, value, line_num, column)
 
 def main():
     statements = '''
-    if
+    a = "a"
+    b = '"66"'
+    if{}{
     iffy
         35.53e-53
         xx
