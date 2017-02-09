@@ -47,19 +47,31 @@ def tokenize(code):
         else:
             if kind == "String" and value:
                 value = value[1:-1] # remove first and last chars
+            elif kind == "Name" and value in keywords:
+                kind = "Keyword" # to convert keywords picked up as names to keywords
             column = mo.start() - line_start
             yield Token(kind, value, line_num, column)
 
 def main():
     statements = '''
     a = "a"
-    b = '"66"'
+    b = ''
     if{}{
     iffy
         35.53e-53
         xx
         0x3aA.Ap-3
         e
+    function readonlytable(table)
+        return setmetatable({}, {
+        __index = table,
+        __newindex = function(table, key, value)
+        error("Attempt to modify read-only table")
+        end,
+        __metatable = false
+        });
+    end
+
     '''
     # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
 
