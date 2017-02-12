@@ -28,7 +28,32 @@ funcname_s ::= `:´ Name | epsilon
 varlist ::= var varlist_c
 varlist_c ::= `,´ var varlist_c | epsilon
 
-var ::= Name | prefixexp `[´ exp `]´ | prefixexp `.´ Name 
+# var ::= Name | prefixexp `[´ exp `]´ | prefixexp `.´ Name 
+
+var ::= 
+    Name var_ |
+    functioncall `[´ exp `]´ var_ |
+    `(´ exp `)´ `[´ exp `]´ var_ |
+    functioncall `.´ Name var_ |
+    `(´ exp `)´ `.´ Name var_
+
+var_ ::= 
+    `[´ exp `]´ var_ |
+    `.´ Name var_ |
+    epsilon
+
+prefixexp ::= 
+    var prefixexp_ |
+    `(´ exp `)´ prefixexp_ 
+
+prefixexp_ ::=
+    args prefixexp_ |
+    `:´ Name args prefixexp_ |
+    epsilon
+
+functioncall ::=
+    prefixexp args |
+    prefixexp `:´ Name args 
 
 # namelist ::= Name {`,´ Name}
 namelist ::= Name namelist_c
@@ -38,11 +63,11 @@ namelist_c ::= `,´ Name namelist_c | epsilon
 explist ::= explist_c exp
 explist_c ::= exp `,´ explist_c | epsilon
 
-exp ::= nil | false | true | Number | String | `...´ | functiondef | prefixexp | tableconstructor | exp binop exp | unop exp 
+# exp ::= nil | false | true | Number | String | `...´ | functiondef | prefixexp | tableconstructor | exp binop exp | unop exp 
+exp ::= nil exp_ | false exp_ | true exp_ | Number exp_ | String exp_ | `...´ exp_ | functiondef exp_ | prefixexp exp_ | tableconstructor exp_ | unop exp exp_ 
+exp_ ::= binop exp exp_ | epsilon
 
-prefixexp ::= var | functioncall | `(´ exp `)´
-
-functioncall ::= prefixexp args | prefixexp `:´ Name args 
+# prefixexp ::= var | functioncall | `(´ exp `)´
 
 # args ::= `(´ [explist] `)´ | tableconstructor | String 
 args ::= `(´ args_s `)´ | tableconstructor | String 

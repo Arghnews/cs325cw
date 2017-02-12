@@ -68,8 +68,6 @@ def main():
         productions[name] = Production(LHS,RHS)
         #print("adding to prod",name)
 
-    return
-
     nonterminal_order = []
     for k, v in symbols.items():
         #print(k," -> ", v)
@@ -80,6 +78,7 @@ def main():
     print(nonterminal_order)
 
     for symbol, prod in list(productions.items()):
+        continue
         #print(k," -> ", v)
         head = prod.LHS
         for rhs in prod.RHS:
@@ -88,19 +87,9 @@ def main():
                 if head.value == sym.value:
                     occurrences += 1
             if occurrences > 1:
+                eliminate_direct_left_recursion(head,prod, symbols, productions)
                 pass
-
-    #eliminate_direct_left_recursion(head,prod,symbols,productions)
-
-    print("Before")
-    for symbol, prod in (productions.items()):
-        #print(symbol," -> ", prod)
-        pass
-    eliminate_indirect_left_recursion(nonterminal_order, symbols, productions)
-    print("After")
-    for symbol, prod in (productions.items()):
-        #print(symbol," -> ", prod)
-        pass
+    
 
 def eliminate_indirect_left_recursion(nonterminal_order,symbols, productions):
     n = len(nonterminal_order)
