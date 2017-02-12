@@ -5,6 +5,8 @@ import re
 import copy
 import sys
 
+epsilon = "epsilon"
+
 lua = '''
 prefixexp ::= Name prefixexp_1 | `(´ exp `)´ prefixexp_1
 prefixexp_1 ::= `[´ exp `]´ prefixexp_1 | `.´ Name prefixexp_1 | args | prefixexp_1 | `:´ Name args prefixexp_1 | epsilon
@@ -105,6 +107,23 @@ def tokenize(code):
             yield Token(kind, value, line_num, column)
 
 def parse(fname):
+    # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
+
+    program = ""
+    with open(fname, "r") as ins:
+        for line in ins:
+            if not re.match(r'^\s*$', line):
+                line = line.rstrip("\n")
+                program += line
+
+    print("Tokens")
+    for token in tokenize(program):
+        #print(token)
+        pass
+
+    grammar()
+
+def grammar():
     # dict from string to symbols
     # dict from string to productions
 
@@ -167,23 +186,14 @@ def parse(fname):
         productions[name] = Production(LHS,RHS)
         #print("adding to prod",name)
 
-    print("The productions")
-    for k, v in productions.items():
-        print(k, v)
+    print("The symbols")
+    for _, v in symbols.items():
+        #print(v)
         pass
 
-    # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
-
-    program = ""
-    with open(fname, "r") as ins:
-        for line in ins:
-            if not re.match(r'^\s*$', line):
-                line = line.rstrip("\n")
-                program += line
-
-    print("Tokens")
-    for token in tokenize(program):
-        print(token)
+    print("The productions")
+    for k, v in productions.items():
+        #print(k, v)
         pass
 
 class Symbol:
