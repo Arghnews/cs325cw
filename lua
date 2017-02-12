@@ -1,18 +1,18 @@
-###################
-var ::=
-    Name |
-    prefixexp `[´ exp `]´ |
-    prefixexp `.´ Name
-
-prefixexp ::=
-    var |
-    functioncall |
-    `(´ exp `)´
-
-functioncall ::=
-    prefixexp args |
-    prefixexp `:´ Name args
-###################
+#
+#var ::=
+    #Name |
+    #prefixexp `[´ exp `]´ |
+    #prefixexp `.´ Name
+#
+#prefixexp ::=
+    #var |
+    #functioncall |
+    #`(´ exp `)´
+#
+#functioncall ::=
+    #prefixexp args |
+    #prefixexp `:´ Name args
+#
 
 #prefixexp ::=
     #var |
@@ -21,35 +21,17 @@ functioncall ::=
 
 # fixed indirect by subbing var and functioncall into prefixexp
 
-prefixexp ::=
-    Name prefixexp_1 |
-    `(´ exp `)´ prefixexp_1
+prefixexp ::= Name prefixexp_1 | `(´ exp `)´ prefixexp_1
     
-prefixexp_1 ::=
-    `[´ exp `]´ prefixexp_1 |
-    `.´ Name prefixexp_1 |
-    args prefixexp_1  |
-    `:´ Name args prefixexp_1 |
-    epsilon
+prefixexp_1 ::= `[´ exp `]´ prefixexp_1 | `.´ Name prefixexp_1 | args | prefixexp_1 | `:´ Name args prefixexp_1 | epsilon
 
-var ::=
-    Name |
-    prefixexp var_prefixexp
+var ::= Name | prefixexp var_prefixexp
 
-var_prefixexp ::=
-    `[´ exp `]´ |
-    `.´ Name
+var_prefixexp ::= `[´ exp `]´ | `.´ Name
 
-functioncall ::=
-    prefixexp functioncall_prefixexp
+functioncall ::= prefixexp functioncall_prefixexp
 
-functioncall_prefixexp ::=
-    args |
-    `:´ Name args
-
-
-
-
+functioncall_prefixexp ::= args | `:´ Name args
 
 chunk ::= chunk_c chunk_s2
 
@@ -111,7 +93,7 @@ funcbody_s ::= parlist | epsilon
 
 parlist ::= namelist parlist_s | `...´
 
-parlist_s = `,´ `...´| epsilon
+parlist_s ::= `,´ `...´ | epsilon
 
 tableconstructor ::= `{´ tableconstructor_s `}´
 
