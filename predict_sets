@@ -1,0 +1,117 @@
+block -> chunk do, while, repeat, if, for, function, local, Name, (, return, break
+args -> ( args_s ) (
+args -> tableconstructor {
+args -> String String
+args_s -> explist nil, false, true, Number, String, ..., function, {, Name, (, -, not, #
+args_s -> epsilon )
+binop -> + +
+binop -> - -
+binop -> * *
+binop -> / /
+binop -> ^ ^
+binop -> % %
+binop -> .. ..
+binop -> < <
+binop -> <= <=
+binop -> > >
+binop -> >= >=
+binop -> == ==
+binop -> ~= ~=
+binop -> and and
+binop -> or or
+chunk -> chunk_c chunk_s2 do, while, repeat, if, for, function, local, Name, (, return, break
+chunk_c -> stat chunk_s1 chunk_c do, while, repeat, if, for, function, local, Name, (
+chunk_c -> epsilon return, break, $, end, elseif, until, then, do, while, repeat, if, for, function, local, Name, (, else
+chunk_s1 -> ; ;
+chunk_s1 -> epsilon do, while, repeat, if, for, function, local, Name, (, return, break, $, end, elseif, until, then, else
+chunk_s2 -> laststat chunk_s1 return, break
+chunk_s2 -> epsilon $, end, elseif, until, then, do, while, repeat, if, for, function, local, Name, (, return, break, else
+exp -> nil exp_1 nil
+exp -> false exp_1 false
+exp -> true exp_1 true
+exp -> Number exp_1 Number
+exp -> String exp_1 String
+exp -> ... exp_1 ...
+exp -> functiondef exp_1 function
+exp -> prefixexp exp_1 Name, (
+exp -> tableconstructor exp_1 {
+exp -> unop exp exp_1 -, not, #
+exp_1 -> binop exp exp_1 +, -, *, /, ^, %, .., <, <=, >, >=, ==, ~=, and, or
+exp_1 -> epsilon , ,, nil, false, true, Number, String, ..., function, {, Name, (, -, not, #, then, do, ), +, *, /, ^, %, .., <, <=, >, >=, ==, ~=, and, or, while, repeat, if, for, local, ;, return, break, $, end, elseif, until, else, }
+explist -> explist_c exp nil, false, true, Number, String, ..., function, {, Name, (, -, not, #
+explist_c -> exp , explist_c nil, false, true, Number, String, ..., function, {, Name, (, -, not, #
+explist_c -> epsilon nil, false, true, Number, String, ..., function, {, Name, (, -, not, #
+field -> [ exp ] = exp 
+field -> Name = exp Name
+field -> exp nil, false, true, Number, String, ..., function, {, Name, (, -, not, #
+fieldlist -> field fieldlist_c fieldlist_s , Name, nil, false, true, Number, String, ..., function, {, (, -, not, #
+fieldlist_c -> fieldsep field fieldlist_c ,, ;
+fieldlist_c -> epsilon ,, ;, }
+fieldlist_s -> fieldsep ,, ;
+fieldlist_s -> epsilon }
+fieldsep -> , ,
+fieldsep -> ; ;
+funcbody -> ( funcbody_s ) block end (
+funcbody_s -> parlist ..., Name
+funcbody_s -> epsilon )
+funcname -> Name funcname_c funcname_s Name
+funcname_c -> . Name funcname_c .
+funcname_c -> epsilon :, (
+funcname_s -> : Name :
+funcname_s -> epsilon (
+functioncall -> prefixexp functioncall_prefixexp Name, (
+functioncall_prefixexp -> args (, String, {
+functioncall_prefixexp -> : Name args :
+functiondef -> function funcbody function
+laststat -> return laststat_s return
+laststat -> break break
+laststat_s -> explist nil, false, true, Number, String, ..., function, {, Name, (, -, not, #
+laststat_s -> epsilon ;, $, end, elseif, until, then, do, while, repeat, if, for, function, local, Name, (, return, break, else
+namelist -> Name namelist_c Name
+namelist_c -> , Name namelist_c ,
+namelist_c -> epsilon =, in, ,, do, while, repeat, if, for, function, local, Name, (, ;, return, break, $, end, elseif, until, then, else, )
+parlist -> namelist parlist_s Name
+parlist -> ... ...
+parlist_s -> , ... ,
+parlist_s -> epsilon )
+prefixexp -> Name prefixexp_1 Name
+prefixexp -> ( exp ) prefixexp_1 (
+prefixexp_1 -> [ exp ] prefixexp_1 
+prefixexp_1 -> . Name prefixexp_1 .
+prefixexp_1 -> args prefixexp_1 (, String, {
+prefixexp_1 -> : Name args prefixexp_1 :
+prefixexp_1 -> epsilon , ., :, (, String, {, +, -, *, /, ^, %, .., <, <=, >, >=, ==, ~=, and, or, , ,, nil, false, true, Number, ..., function, Name, not, #, then, do, ), while, repeat, if, for, local, ;, return, break, $, end, elseif, until, else, }
+stat -> varlist = explist Name, (
+stat -> functioncall Name, (
+stat -> do block end do
+stat -> while exp do block end while
+stat -> repeat block until exp repeat
+stat -> if exp then block stat_c stat_s1 end if
+stat -> for stat_for for
+stat -> function funcname funcbody function
+stat -> local stat_local local
+stat_c -> elseif exp then block stat_c elseif
+stat_c -> epsilon then, else
+stat_for -> Name = exp , exp stat_s2 do block end Name
+stat_for -> namelist in explist do block end Name
+stat_local -> function Name funcbody function
+stat_local -> namelist stat_s3 Name
+stat_s1 -> else block else
+stat_s1 -> epsilon end
+stat_s2 -> , exp ,
+stat_s2 -> epsilon do
+stat_s3 -> = explist =
+stat_s3 -> epsilon do, while, repeat, if, for, function, local, Name, (, ;, return, break, $, end, elseif, until, then, else
+tableconstructor -> { tableconstructor_s } {
+tableconstructor_s -> fieldlist , Name, nil, false, true, Number, String, ..., function, {, (, -, not, #
+tableconstructor_s -> epsilon }
+unop -> - -
+unop -> not not
+unop -> # #
+var -> Name Name
+var -> prefixexp var_prefixexp Name, (
+var_prefixexp -> [ exp ] 
+var_prefixexp -> . Name .
+varlist -> var varlist_c Name, (
+varlist_c -> , var varlist_c ,
+varlist_c -> epsilon =
