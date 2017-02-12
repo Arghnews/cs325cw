@@ -1,0 +1,38 @@
+P -> Qa|Rc
+Q -> b|e
+R -> d
+
+First(Qa) = {b,a}
+First(Q)  = {e,b}
+    add e
+    First(be) = First(b) = b
+    add b
+First(a)  = a
+First(Rc) = {d}
+First(R)  = d
+First(c)  = c
+First(e)  = {}
+
+
+P -> abcQ|aQb|QS|QSc
+S -> d|f
+R -> Pf
+
+Follow(Q) = {b,c}
+    from aQb add b  
+Follow(S) = {c}
+
+First(S)  = {d,f}
+First(R)  = 
+
+Left recursion - algo both indirect and direct - cases
+Left factoring - care for "indirect" ?
+Convert *, ? into long hand
+First set
+Follow set
+
+Start EOF
+
+Start = ABcedAB
+ABcedAB{eof}
+

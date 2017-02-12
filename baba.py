@@ -56,6 +56,7 @@ def main():
     statements = '''
     a = "a"
     b = ''
+    d = 5.5
     if{}{
     iffy
         35.53e-53
