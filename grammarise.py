@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import re
+import copy
 
 def main():
 
@@ -25,40 +26,59 @@ def main():
     for l in lines:
         pair = l.split(delim)
         symbol = pair[0]
+        symbol = symbol.strip()
         if symbol[0] == comment:
             continue
         # add non terminal
-        symbol = symbol.strip()
         symbols[symbol] = Symbol(False,symbol)
         #print("Added symbol",symbols[symbol],"with key",symbol,len(symbol))
 
     for l in lines:
         pair = l.split(delim)
-        name = pair[0]
+        name = pair[0].strip()
         if name[0] == comment:
             continue
         sec = pair[1]
+        #print("Name",name)
+        LHS = copy.deepcopy(symbols[name])
+        #print("LHS:",LHS)
+        RHS = []
         for s in sec.split("|"):
             s = s.lstrip()
             lists = s.split()
             # A ::= Bb | c
             # l below is B,b, then c
+            sequence = []
             for l in lists: # each symbol in sublist
                 symbol = l
+                symbol = symbol.strip()
                 if l and l[0] == b_tick and l[-1] == f_tick:
                     symbol = l[1:-1]
-                symbol = symbol.strip()
                 is_in = symbol in symbols
+                terminal = not is_in # non-t's in map already
+                # add terminal
                 if not is_in:
-                    #print("Terminal to add",symbol)
-                    # add terminal
-                    symbols[symbol] = Symbol(True,symbol)
-        #productions[symbol] = Production(symbols[symbol],rhs_lists)
+                    #print("Putting in",symbol,"as terminal",terminal)
+                    symbols[symbol] = Symbol(terminal,symbol)
+                else:
+                    terminal = symbols[symbol].terminal
+                #print("Appending",Symbol(terminal,symbol),"as terminal",terminal)
+                sequence.append(Symbol(terminal,symbol))
+            RHS.append(sequence)
+        productions[name] = Production(LHS,RHS)
+        #print("adding to prod",name)
 
     for k, v in symbols.items():
+        #print(k," -> ", v)
+        pass
+
+    for k, v in productions.items():
         print(k," -> ", v)
+        pass
 
 class Symbol:
+    b_tick = r'`'
+    f_tick = r'´'
     def __init__(self,terminal,value):
         self.terminal = terminal
         self.value = value
@@ -66,16 +86,34 @@ class Symbol:
         self.follow_set = set()
 
     def __str__(self):
-        t = "(nt)"
+        return self.toString()
+
+    def toString(self):
+        t = ""
         if self.terminal:
-            t = "(t)"
-        t = self.value + t
+            t += Symbol.b_tick
+            pass
+        t += str(self.value)
+        if self.terminal:
+            t += Symbol.f_tick
+            pass
         return t
+
+    def __repr__(self):
+        return self.toString()
 
 class Production:
     def __init__(self,LHS,RHS):
         self.LHS = LHS # symbol
         self.RHS = RHS # list of lists
+
+    def __str__(self):
+        p = ""
+        p += "LHS:" + str(self.LHS) + " to ["
+        for o in self.RHS:
+            p += " " + str(o)
+        p += "]"
+        return p
 
 if __name__ == "__main__":
     main()
