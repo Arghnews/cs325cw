@@ -95,6 +95,8 @@ def parse(fname):
     firstSets["unop"] = [('-',MATCH_VALUE), ('not',MATCH_VALUE), ('#',MATCH_VALUE)]
     firstSets["fieldsep"] = [(',',MATCH_VALUE), (';',MATCH_VALUE)]
     firstSets["exp"] = [('nil',MATCH_VALUE),('false',MATCH_VALUE),('true',MATCH_VALUE),('Number', MATCH_TYPE), ('String', MATCH_TYPE), ('...', MATCH_VALUE),('function',MATCH_VALUE),('{',MATCH_VALUE),('Name',MATCH_TYPE),('-',MATCH_VALUE),('not',MATCH_VALUE),('#',MATCH_VALUE)]
+    firstSets["args"] = [('(',MATCH_VALUE),('{',MATCH_VALUE),('String',MATCH_TYPE)]
+    firstSets["tableconstructor"] = [('{',MATCH_VALUE)]
 
     # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
     program = ""
@@ -114,8 +116,14 @@ def parse(fname):
     for i, t in enumerate(tokens):
         print(i,t)
     print("Now the program starts fo real")
-
     i = 0
+
+    
+    i_b = i
+    i, tokens = args(i, tokens)
+    print("args",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+    return
+
     i_b = i
     i, tokens = parlist(i, tokens)
     print("Consumed in parlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
@@ -148,6 +156,35 @@ def parse(fname):
     i, tokens = fieldlist(i, tokens)
     print("fieldlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
+    i_b = i
+    i, tokens = tableconstructor(i, tokens)
+    print("tableconstructor",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    #i_b = i
+    #i, tokens = explist(i, tokens)
+    #print("explist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+def args(i, tokens):
+    if contains(i, tokens, [("(",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "(")
+        i, tokens = optional(i, tokens, [(explist,MATCH_FUNCTION)], 1)
+        i, tokens = matchValueNow(i, tokens, ")")
+    elif contains(i, tokens, firstSets["tableconstructor"]):
+        i, tokens = tableconstructor(i, tokens)
+    elif contains(i, tokens, [("String",MATCH_TYPE)]):
+        i, tokens = matchTypeNow(i, tokens, "String")
+    return i, tokens
+
+def explist(i, tokens):
+    i, tokens = star(i, tokens, [(exp,MATCH_FUNCTION),(",",MATCH_VALUE)], 2)
+    i, tokens = exp(i, tokens)
+    return i, tokens
+
+def tableconstructor(i, tokens):
+    i, tokens = matchValueNow(i, tokens, "{")
+    i, tokens = optional(i, tokens, [(fieldlist,MATCH_FUNCTION)], 1)
+    i, tokens = matchValueNow(i, tokens, "}")
+    return i, tokens
 
 def fieldlist(i, tokens):
     i, tokens = field(i, tokens)
@@ -173,7 +210,8 @@ def field(i, tokens):
     return i, tokens
     
 def exp(i, tokens):
-    return i, tokens
+    return matchTypeNow(i,tokens,"String")
+    #return i, tokens
 
 def funcname(i, tokens):
     i, tokens = matchTypeNow(i,tokens,"Name")
