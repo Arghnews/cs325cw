@@ -14,24 +14,6 @@ stat ::=  varlist `=´ explist |
      local function Name funcbody |
      local namelist [ `=´ explist ]
 
-laststat ::= return [ explist ] | break
-
-varlist ::= var { `,´ var }
-
-exp_args_back ::= exp_back | args_back
-
-var ::= exp_front { exp_args_back } exp_back | Name
-
-prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
-
-functioncall ::= exp_front { exp_args_back } args_back
-
-exp_front ::= Name | `(´ exp `)´
-
-exp_back ::= `[´ exp `]´ | `.´ Name
-
-args_back ::= args | `:´ Name args
-
 exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `...´ exp_p | functiondef exp_p | 
      prefixexp exp_p | tableconstructor exp_p  | unop exp exp_p 
 
@@ -41,6 +23,24 @@ functiondef ::= function funcbody
 
 funcbody ::= `(´ [ parlist ] `)´ block end
 
+
+laststat ::= return [ explist ] | break
+
+prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
+
+varlist ::= var { `,´ var }
+
+var ::= exp_front { exp_args_back } exp_back | Name
+
+functioncall ::= exp_front { exp_args_back } args_back
+
+exp_args_back ::= exp_back | args_back
+
+exp_front ::= Name | `(´ exp `)´
+
+exp_back ::= `[´ exp `]´ | `.´ Name
+
+args_back ::= args | `:´ Name args
 
 args ::= `(´ [ explist ] `)´ | tableconstructor | String 
 

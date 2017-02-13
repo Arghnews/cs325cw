@@ -97,6 +97,9 @@ def parse(fname):
     firstSets["exp"] = [('nil',MATCH_VALUE),('false',MATCH_VALUE),('true',MATCH_VALUE),('Number', MATCH_TYPE), ('String', MATCH_TYPE), ('...', MATCH_VALUE),('function',MATCH_VALUE),('{',MATCH_VALUE),('Name',MATCH_TYPE),('-',MATCH_VALUE),('not',MATCH_VALUE),('#',MATCH_VALUE)]
     firstSets["args"] = [('(',MATCH_VALUE),('{',MATCH_VALUE),('String',MATCH_TYPE)]
     firstSets["tableconstructor"] = [('{',MATCH_VALUE)]
+    firstSets["exp_back"] = [('[',MATCH_VALUE),('.',MATCH_VALUE)]
+    firstSets["args_back"] = firstSets["args"] + [(':',MATCH_VALUE)]
+    firstSets["exp_front"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
 
     # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
     program = ""
@@ -120,9 +123,40 @@ def parse(fname):
 
     
     i_b = i
-    i, tokens = args(i, tokens)
-    print("args",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+    i, tokens = laststat(i, tokens)
+    print("laststat",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
     return
+
+    i_b = i
+    i, tokens = prefixexp(i, tokens)
+    print("prefixexp",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = varlist(i, tokens)
+    print("varlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+    i_b = i
+    i, tokens = var(i, tokens)
+    print("var",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = functioncall(i, tokens)
+    print("functioncall",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = exp_args_back(i, tokens)
+    print("exp_args_back",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = exp_front(i, tokens)
+    print("exp_front",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = exp_back(i, tokens)
+    print("exp_back",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = args_back(i, tokens)
+    print("args_back",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
     i_b = i
     i, tokens = parlist(i, tokens)
@@ -163,6 +197,81 @@ def parse(fname):
     #i_b = i
     #i, tokens = explist(i, tokens)
     #print("explist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+def laststat(i, tokens):
+    if contains(i, tokens, [("return",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "return")
+        i, tokens = optional(i, tokens, [(explist,MATCH_FUNCTION)], 1)
+    elif contains(i, tokens, [("break",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "break")
+
+    return i, tokens
+
+def prefixexp(i, tokens):
+    if contains(i, tokens, [("Name",MATCH_TYPE)]):
+        i, tokens = matchTypeNow(i, tokens, "Name")
+        i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+    elif contains(i, tokens, [("(",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "(")
+        i, tokens = exp(i, tokens)
+        i, tokens = matchValueNow(i, tokens, ")")
+        i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+    return i, tokens
+
+def varlist(i, tokens):
+    i, tokens = var(i, tokens)
+    i, tokens = star(i, tokens, [(",",MATCH_VALUE),(var,MATCH_FUNCTION)], 2)
+    return i, tokens
+
+def var(i, tokens):
+    if contains(i, tokens, firstSets["exp_front"]):
+        i, tokens = exp_front(i, tokens)
+        i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+        i, tokens = exp_back(i, tokens)
+    elif contains(i, tokens, [("Name",MATCH_TYPE)]):
+        i, tokens = matchTypeNow(i, tokens, "Name")
+    return i, tokens
+
+def functioncall(i, tokens):
+    i, tokens = exp_front(i, tokens)
+    i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+    i, tokens = args_back(i, tokens)
+    return i, tokens
+
+def exp_args_back(i, tokens):
+    if contains(i, tokens, firstSets["exp_back"]):
+        i, tokens = exp_back(i, tokens)
+    elif contains(i, tokens, firstSets["args_back"]):
+        i, tokens = args_back(i, tokens)
+    return i, tokens
+
+def exp_front(i, tokens):
+    if contains(i, tokens, [("Name",MATCH_TYPE)]):
+        i, tokens = matchTypeNow(i, tokens, "Name")
+    elif contains(i, tokens, [("(",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "(")
+        i, tokens = exp(i, tokens)
+        i, tokens = matchValueNow(i, tokens, ")")
+    return i, tokens
+
+def exp_back(i, tokens):
+    if contains(i, tokens, [("[",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "[")
+        i, tokens = exp(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "]")
+    elif contains(i, tokens, [(".",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, ".")
+        i, tokens = matchTypeNow(i, tokens, "Name")
+    return i, tokens
+
+def args_back(i, tokens):
+    if contains(i, tokens, firstSets["args"]):
+        i, tokens = args(i, tokens)
+    elif contains(i, tokens, [(":",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, ":")
+        i, tokens = matchTypeNow(i, tokens, "Name")
+        i, tokens = args(i, tokens)
+    return i, tokens
 
 def args(i, tokens):
     if contains(i, tokens, [("(",MATCH_VALUE)]):
