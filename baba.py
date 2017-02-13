@@ -81,6 +81,11 @@ end
 btick = r'`'
 ftick = r'´'
 
+# used in funcs when telling lookahead func
+# what to look for, ie tuples of ",",MATCH_VALUE
+MATCH_TYPE = "type"
+MATCH_VALUE = "value"
+
 def parse(fname):
     # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
     program = ""
@@ -94,7 +99,7 @@ def parse(fname):
     for token in tokenize(program):
         tokens.append(token)
     # append EOF token
-    EOF = Token("EOF","EOF",tokens[-1].line+1,0)
+    EOF = Token("EOF","EOF",0 if len(tokens) == 0 else tokens[-1].line+1,0)
     tokens.append(EOF)
 
     for i, t in enumerate(tokens):
@@ -109,9 +114,14 @@ def parse(fname):
     #i, tokens = namelist(i, tokens)
     #print("Consumed in namelist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
+def namelist(i, tokens):
+    i, tokens = matchType("Name")(i,tokens)
+    i, tokens = optional(i, tokens, [(",",MATCH_VALUE), ("Name",MATCH_TYPE)], 2)
+    return i, tokens
+
 def matchType(type):
     def f(i, tokens):
-        if match_t(tokens[i],type):
+        if match_t(tokens,i,type):
             i += 1
         return i, tokens
     # for nice error print
@@ -120,7 +130,7 @@ def matchType(type):
 
 def matchValue(value):
     def f(i, tokens):
-        if match_v(tokens[i],value):
+        if match_v(tokens,i,value):
             i += 1
         return i, tokens
     # for nice error print
@@ -128,62 +138,69 @@ def matchValue(value):
     return f
 
 def name_suffix(i, tokens):
-    if match_v(tokens[i],","):
+    if match_v(tokens,i,","):
         i += 1
         i, tokens = name(i, tokens)
     else:
         pass
     return i, tokens
 
-def star(i, tokens, funcs):
-    cont = True
-    while cont:
-        original_i = i
+def star_do(i, tokens, funcs):
+    while True:
         for f in funcs:
-            last_i = i
             i, tokens = f(i, tokens)
-            cont = last_i != i
-            if i == original_i:
-                # fine, not another instance of a in
-                # a*
-                print("Fine return",tokens[i])
-                return original_i, tokens
-            elif not cont:
-                # error, as for a -> b { c d}
-                # got b c q as d != q
-                print("Error, expected ",f.__name__)
-                return original_i, tokens
-    return i, tokens
+        yield i, tokens
 
-def optional(i, tokens, funcs):
-    cont = True
-    original_i = i
+def optional_do(i, tokens, funcs):
     for f in funcs:
-        last_i = i
         i, tokens = f(i, tokens)
-        cont = last_i != i
-        if i == original_i:
-            # fine, not another instance of a in
-            # a*
-            print("Fine return",tokens[i])
-            return original_i, tokens
-        elif not cont:
-            # error, as for a -> b { c d}
-            # got b c q as d != q
-            print("Error, expected ",f.__name__)
-            return original_i, tokens
+    yield i, tokens
+
+def parlist(i, tokens):
+    i, tokens = namelist(i, tokens)
+    i, tokens = optional(i, tokens, [matchValue(","),matchValue("...")])
     return i, tokens
 
-def namelist(i, tokens):
-    i, tokens = matchType("Name")(i,tokens)
-    i, tokens = optional(i, tokens, [matchValue(","),matchType("Name")])
+def something(i, tokens, func_tuples, lookahead, repeater):
+    # creates list of funcs that are that grammar
+    # thing that we're doing
+    funcs = []
+    for j, (match, match_type) in enumerate(func_tuples):
+        if match_type == MATCH_VALUE:
+            funcs.append(matchValue(match))
+        elif match_type == MATCH_TYPE:
+            funcs.append(matchType(match))
+
+    # lookahead function right here
+    def cont():
+        for j in range(0, min(len(func_tuples),lookahead)):
+            b = False
+            if func_tuples[j][1] == MATCH_VALUE:
+                b = match_v(tokens, i+j, func_tuples[j][0])
+            elif func_tuples[j][1] == MATCH_TYPE:
+                b = match_t(tokens, i+j, func_tuples[j][0])
+            if not b:
+                return False
+        return True
+
+    if cont():
+        for i, tokens in repeater(i, tokens, funcs):
+            if not cont():
+                break
     return i, tokens
 
-def match_t(token,type):
-    return token.type == type
 
-def match_v(token, val):
-    return token.value == val
+def optional(i, tokens, func_tuples, lookahead):
+    return something(i, tokens, func_tuples, lookahead, optional_do)
+
+def star(i, tokens, func_tuples, lookahead):
+    return something(i, tokens, func_tuples, lookahead, star_do)
+
+def match_t(tokens,i,type):
+    return i < len(tokens) and tokens[i].type == type
+
+def match_v(tokens,i,val):
+    return i < len(tokens) and tokens[i].value == val
 
 if __name__ == "__main__":
     parse(sys.argv[1])

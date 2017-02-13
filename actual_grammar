@@ -34,8 +34,6 @@ exp_back ::= `[´ exp `]´ | `.´ Name
 
 args_back ::= args | `:´ Name args
 
-namelist ::= Name { `,´ Name }
-
 explist ::= { exp `,´ } exp
 
 exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `...´ exp_p | function exp_p | 
@@ -43,13 +41,15 @@ exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `.
 
 exp_p ::= binop exp exp_p | epsilon
 
-args ::=  `(´ [ explist ] `)´ | tableconstructor | String 
+args ::= `(´ [ explist ] `)´ | tableconstructor | String 
 
 function ::= function funcbody
 
 funcbody ::= `(´ [ parlist ] `)´ block end
 
 parlist ::= namelist [ `,´ `...´ ] | `...´
+
+namelist ::= Name { `,´ Name }
 
 tableconstructor ::= `{´ [ fieldlist ] `}´
 
