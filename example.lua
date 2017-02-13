@@ -1,24 +1,17 @@
-local cookie = {}
-local remy =  "remy"
+function lmap(f, l)
+	return delay(function()
+		return cons(f(lcar(l)), lmap(f, lcdr(l)));
+	end);
+end;
 
-function cookie.set(r, key, value, path)
-	path = path or "/"
-	if remy.detect(r) == remy.MODE_CGILUA then
-		local ck =  "cgilua.cookies"
-		return ck.set(key,value,{path=path})
-	end
-	r.headers_out['Set-Cookie'] = ("%s=%s;Path=%s;"):format(key, value, path)
-end
+function lmerge(a, b)
+	return delay(function()
+		local x, y = lcar(a), lcar(b);
+		if x <= y then
+			return cons(x, lmerge(lcdr(a), b));
+		else
+			return cons(y, lmerge(a, lcdr(b)));
+		end;
+	end);
+end;
 
-function cookie.get(r, key)
-	local remy_mode = remy.detect(r)
-	if remy_mode == remy.MODE_CGILUA then
-		local ck =  "cgilua.cookies"
-		return ck.get(key)
-	elseif remy_mode == remy.MODE_LWAN then
-		return r.native_request:cookie(key)
-	end
-	return (r.headers_in['Cookie'] or ""):match(key .. "=([^;]+)") or ""
-end
-
-return cookie
