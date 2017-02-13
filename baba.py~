@@ -85,14 +85,13 @@ ftick = r'´'
 # what to look for, ie tuples of ",",MATCH_VALUE
 MATCH_TYPE = "type"
 MATCH_VALUE = "value"
-MATCH_FUNCTION = "function_type"
 
 firstSets = dict()
 
 def parse(fname):
 
     firstSets["binop"] = [('+',MATCH_VALUE), ('-',MATCH_VALUE), ('*',MATCH_VALUE), ('/',MATCH_VALUE), ('^',MATCH_VALUE), ('%',MATCH_VALUE), '..', ('<',MATCH_VALUE), '<=', ('>',MATCH_VALUE), '>=', '==', '~=', 'and', 'or']
-    firstSets["unop"] = [('-',MATCH_VALUE), ('not',MATCH_VALUE), ('#',MATCH_VALUE)]
+    firstSets["unop"] = [('-',MATCH_VALUE), 'not', ('#',MATCH_VALUE)]
     firstSets["fieldsep"] = [(',',MATCH_VALUE), (';',MATCH_VALUE)]
     firstSets["exp"] = [('nil',MATCH_VALUE),('false',MATCH_VALUE),('true',MATCH_VALUE),('Number', MATCH_TYPE), ('String', MATCH_TYPE), ('...', MATCH_VALUE),('function',MATCH_VALUE),('{',MATCH_VALUE),('Name',MATCH_TYPE),('-',MATCH_VALUE),('not',MATCH_VALUE),('#',MATCH_VALUE)]
 
@@ -140,37 +139,18 @@ def parse(fname):
     i, tokens = funcname(i, tokens)
     print("funcname",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
-    i_b = i
-    i, tokens = field(i, tokens)
-    print("field",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
-    i_b = i
-    i, tokens = fieldlist(i, tokens)
-    print("fieldlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-
-def fieldlist(i, tokens):
-    i, tokens = field(i, tokens)
-    i, tokens = star(i, tokens, [(fieldsep,MATCH_FUNCTION),(field,MATCH_FUNCTION)], 2)
-    i, tokens = optional(i, tokens, [(fieldsep,MATCH_FUNCTION)], 1)
-    return i, tokens
 
 def field(i, tokens):
     if contains(i, tokens, [("[",MATCH_VALUE)]):
-        # todo, fill the aftermath of each of these
-        # with checks and should haves
         i, tokens = matchValueNow(i, tokens, "[")
         i, tokens = exp(i, tokens)
         i, tokens = matchValueNow(i, tokens, "]")
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
-        i, tokens = matchTypeNow(i, tokens, "Name")
-        i, tokens = matchValueNow(i, tokens, "=")
-        i, tokens = exp(i, tokens)
     elif contains(i, tokens, firstSets["exp"]):
         i, tokens = exp(i, tokens)
-    return i, tokens
     
 def exp(i, tokens):
     return i, tokens
@@ -200,15 +180,15 @@ def namelist(i, tokens):
     return i, tokens
 
 def binop(i, tokens):
-    return matchTerminalInList(i, tokens, firstSets["binop"])
+    return matchTerminalListError(i, tokens, firstSets["binop"], "Could not find binary")
 
 def unop(i, tokens):
     unop_list = ['-', 'not', '#']
-    return matchTerminalInList(i, tokens, firstSets["unop"])
+    return matchTerminalListError(i, tokens, firstSets["unop"], "Could not find unary operator")
 
 def fieldsep(i, tokens):
     fieldsep_list = [',', ';']
-    return matchTerminalInList(i, tokens, firstSets["fieldsep"])
+    return matchTerminalListError(i, tokens, firstSets["fieldsep"], "Could not find field separator")
 
 
 
@@ -232,14 +212,14 @@ def contains(i, tokens, firstSet):
 def matchTerminalListError(i, tokens, list, err):
     i_b = i
     i, tokens = matchTerminalInList(i, tokens, list)
-    #if i == i_b:
-        #print(err)
+    if i == i_b:
+        print(err)
     return i, tokens
 
 def matchTerminalInList(i, tokens, list):
     for op in list:
-        if lookahead(i, tokens, [op], 1):
-            i, tokens = matchValueNow(i, tokens, op[0])
+        if lookahead(i, tokens, [(op,MATCH_VALUE)], 1):
+            i, tokens = matchValueNow(i, tokens, op)
             break
     return i, tokens
 
@@ -275,16 +255,9 @@ def lookahead(i, tokens, func_tuples, lookahead_n):
             b = match_v(tokens, i+j, func_tuples[j][0])
         elif func_tuples[j][1] == MATCH_TYPE:
             b = match_t(tokens, i+j, func_tuples[j][0])
-        elif func_tuples[j][1] == MATCH_FUNCTION:
-            b = i_changed(i+j, tokens, func_tuples[j][0])
         if not b:
             return False
     return True
-
-def i_changed(i, tokens, f):
-    i_b = i
-    i_after, _ = f(i, tokens)
-    return i_b != i_after
 
 def star_do(i, tokens, funcs):
     while True:
@@ -306,8 +279,6 @@ def something(i, tokens, func_tuples, lookahead_n, repeater):
             funcs.append(matchValue(match))
         elif match_type == MATCH_TYPE:
             funcs.append(matchType(match))
-        elif match_type == MATCH_FUNCTION:
-            funcs.append(match)
 
     if lookahead(i, tokens, func_tuples, lookahead_n):
         for i, tokens in repeater(i, tokens, funcs):
