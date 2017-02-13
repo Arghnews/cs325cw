@@ -108,16 +108,37 @@ def parse(fname):
 
     i = 0
     i_b = i
-    i, tokens = namelist(i, tokens)
-    print("Consumed in namelist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-    #i_b = i
-    #i, tokens = namelist(i, tokens)
-    #print("Consumed in namelist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+    i, tokens = parlist(i, tokens)
+    print("Consumed in parlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = parlist(i, tokens)
+    print("Parlist 2",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+def parlist(i, tokens):
+    # chosen the ... only
+    if lookahead(i, tokens, [("...",MATCH_VALUE)], 1):
+        i, tokens = matchValueNow(i, tokens, "...")
+    # namelist
+    elif lookahead(i, tokens, [("Name",MATCH_TYPE)], 1):
+        i, tokens = namelist(i, tokens)
+        i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 2)
+
+    else:
+        print("This is not the parlist you've been looking for")
+    
+    return i, tokens
 
 def namelist(i, tokens):
-    i, tokens = matchType("Name")(i,tokens)
+    i, tokens = matchTypeNow(i,tokens,"Name")
     i, tokens = star(i, tokens, [(",",MATCH_VALUE), ("Name",MATCH_TYPE)], 2)
     return i, tokens
+
+def matchTypeNow(i, tokens, type):
+    return matchType(type)(i,tokens)
+
+def matchValueNow(i, tokens, value):
+    return matchValue(value)(i,tokens)
 
 def matchType(type):
     def f(i, tokens):
@@ -137,13 +158,17 @@ def matchValue(value):
     f.__name__ = value
     return f
 
-def name_suffix(i, tokens):
-    if match_v(tokens,i,","):
-        i += 1
-        i, tokens = name(i, tokens)
-    else:
-        pass
-    return i, tokens
+# lookahead function right here
+def lookahead(i, tokens, func_tuples, lookahead_n):
+    for j in range(0, min(len(func_tuples),lookahead_n)):
+        b = False
+        if func_tuples[j][1] == MATCH_VALUE:
+            b = match_v(tokens, i+j, func_tuples[j][0])
+        elif func_tuples[j][1] == MATCH_TYPE:
+            b = match_t(tokens, i+j, func_tuples[j][0])
+        if not b:
+            return False
+    return True
 
 def star_do(i, tokens, funcs):
     while True:
@@ -156,12 +181,7 @@ def optional_do(i, tokens, funcs):
         i, tokens = f(i, tokens)
     yield i, tokens
 
-def parlist(i, tokens):
-    i, tokens = namelist(i, tokens)
-    i, tokens = optional(i, tokens, [matchValue(","),matchValue("...")])
-    return i, tokens
-
-def something(i, tokens, func_tuples, lookahead, repeater):
+def something(i, tokens, func_tuples, lookahead_n, repeater):
     # creates list of funcs that are that grammar
     # thing that we're doing
     funcs = []
@@ -171,24 +191,12 @@ def something(i, tokens, func_tuples, lookahead, repeater):
         elif match_type == MATCH_TYPE:
             funcs.append(matchType(match))
 
-    # lookahead function right here
-    def cont():
-        for j in range(0, min(len(func_tuples),lookahead)):
-            b = False
-            if func_tuples[j][1] == MATCH_VALUE:
-                b = match_v(tokens, i+j, func_tuples[j][0])
-            elif func_tuples[j][1] == MATCH_TYPE:
-                b = match_t(tokens, i+j, func_tuples[j][0])
-            if not b:
-                return False
-        return True
-
-    if cont():
+    if lookahead(i, tokens, func_tuples, lookahead_n):
         for i, tokens in repeater(i, tokens, funcs):
-            if not cont():
+            if not lookahead(i, tokens, func_tuples, lookahead_n):
                 break
-    return i, tokens
 
+    return i, tokens
 
 def optional(i, tokens, func_tuples, lookahead):
     return something(i, tokens, func_tuples, lookahead, optional_do)
