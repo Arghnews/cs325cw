@@ -46,7 +46,7 @@ args_back ::= args | `:´ Name args
 
 args ::= `(´ [ explist ] `)´ | tableconstructor | String 
 
-explist ::= { exp `,´ } exp
+explist ::=  exp { `,´ exp }
 
 tableconstructor ::= `{´ [ fieldlist ] `}´
 

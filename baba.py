@@ -4,6 +4,7 @@ import collections
 import re
 import copy
 import sys
+import traceback
 
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
@@ -175,6 +176,7 @@ def exp_p(i, tokens):
 def stat_for(i, tokens):
     if contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i+1, tokens, [("=",MATCH_VALUE)]):
         i, tokens = matchTypeNow(i, tokens, "Name")
+        print("Equals in stat_for, Name",i)
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
         i, tokens = matchValueNow(i, tokens, ",")
@@ -205,11 +207,20 @@ def stat_local(i, tokens):
     return i, tokens
 
 def stat(i, tokens):
-    if contains(i, tokens, firstSets["varlist"]):
+    print("We're in stat",i)
+    a = contains(i, tokens, firstSets["varlist"]) 
+    b = contains(i+1, tokens, [("=",MATCH_VALUE)])
+    print("First and second conds",a,b)
+    print(tokens[i],tokens[i+1])
+    if contains(i, tokens, firstSets["varlist"]) and contains(i+1, tokens, [("=",MATCH_VALUE), ("[",MATCH_VALUE)]):
+        print("In stat, going to do varlist",tokens[i],i)
         i, tokens = varlist(i, tokens)
+        print("In stat, going to match =",tokens[i],i)
         i, tokens = matchValueNow(i, tokens, "=")
+        print("In stat, going to match explist",tokens[i],i)
         i, tokens = explist(i, tokens)
-    elif contains(i, tokens, firstSets["functioncall"]):
+        print("In stat, done",tokens[i],i)
+    elif contains(i, tokens, firstSets["functioncall"]) and contains(i+1, tokens, firstSets["exp_args_back"]+firstSets["args_back"]):
         i, tokens = functioncall(i, tokens)
     elif contains(i, tokens, [("do",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "do")
@@ -339,9 +350,14 @@ def exp_front(i, tokens):
 
 def exp_back(i, tokens):
     if contains(i, tokens, [("[",MATCH_VALUE)]):
+        print("\n")
+        print("In exp back start",tokens[i],i)
         i, tokens = matchValueNow(i, tokens, "[")
+        print("In exp back matched [",tokens[i],i)
         i, tokens = exp(i, tokens)
+        print("In exp back exp",tokens[i],i)
         i, tokens = matchValueNow(i, tokens, "]")
+        print("In exp_back leaving",tokens[i],i)
     elif contains(i, tokens, [(".",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, ".")
         i, tokens = matchTypeNow(i, tokens, "Name")
@@ -369,9 +385,9 @@ def args(i, tokens):
 
 def explist(i, tokens):
     error("Starting explist",i)
-    i, tokens = star(i, tokens, [(exp,MATCH_FUNCTION),(",",MATCH_VALUE)], 2)
-    error("In explist, done with star(exp, ,)",i)
     i, tokens = exp(i, tokens)
+    error("In explist, done with first exp",i)
+    i, tokens = star(i, tokens, [(",",MATCH_VALUE),(exp,MATCH_FUNCTION)], 2)
     error("Leaving explist",i)
     return i, tokens
 
@@ -394,10 +410,12 @@ def field(i, tokens):
         i, tokens = matchValueNow(i, tokens, "[")
         i, tokens = exp(i, tokens)
         i, tokens = matchValueNow(i, tokens, "]")
+        print("Equals in field, in [",i)
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = matchTypeNow(i, tokens, "Name")
+        print("Equals in field, in Name",i)
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
     elif contains(i, tokens, firstSets["exp"]):
@@ -441,6 +459,7 @@ def exp(i, tokens):
         i, tokens = exp(i, tokens)
         i, tokens = exp_p(i, tokens)
     error("Returning from exp",i)
+    #traceback.print_exc()
     return i, tokens
 
 def funcname(i, tokens):
@@ -491,10 +510,16 @@ def matchTerminalInList(i, tokens, list):
     return i, tokens
 
 def matchTypeNow(i, tokens, type):
-    return matchType(type)(i,tokens)
+    b = matchType(type)(i,tokens)
+    if b:
+        print("Matched",i," to ",type)
+    return b
 
 def matchValueNow(i, tokens, value):
-    return matchValue(value)(i,tokens)
+    b = matchValue(value)(i,tokens)
+    if b:
+        print("Matched",i," to ",value)
+    return b
 
 def matchType(type):
     def f(i, tokens):
@@ -537,7 +562,7 @@ def lookahead(i, tokens, func_tuples, lookahead_n):
             b = match_t(tokens, i+j, func_tuples[j][0])
         elif func_tuples[j][1] == MATCH_FUNCTION:
             firstSet = firstSets[func_tuples[j][0].__name__]
-            b = contains(i, tokens, firstSet)
+            b = contains(i+j, tokens, firstSet)
             #b = i_changed(i+j, tokens, func_tuples[j][0])
         if not b:
             errors_switch -= 1
