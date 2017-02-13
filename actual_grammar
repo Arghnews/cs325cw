@@ -14,7 +14,7 @@ stat ::=  varlist `=´ explist |
      local function Name funcbody |
      local namelist [ `=´ explist ]
 
-laststat ::= return [explist] | break
+laststat ::= return [ explist ] | break
 
 funcname ::= Name { `.´ Name } [ `:´ Name ]
 

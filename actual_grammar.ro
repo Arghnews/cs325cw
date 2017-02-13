@@ -1,66 +1,64 @@
-chunk ::= {stat [`;´]} [laststat [`;´]]
+chunk ::= { stat [`;´] } [ laststat [`;´] ]
 
-    block ::= chunk
+block ::= chunk
 
-    stat ::=  varlist `=´ explist | 
-         functioncall | 
-         do block end | 
-         while exp do block end | 
-         repeat block until exp | 
-         if exp then block {elseif exp then block} [else block] end | 
-         for Name `=´ exp `,´ exp [`,´ exp] do block end | 
-         for namelist in explist do block end | 
-         function funcname funcbody | 
-         local function Name funcbody | 
-         local namelist [`=´ explist] 
+stat ::=  varlist `=´ explist | 
+     functioncall | 
+     do block end | 
+     while exp do block end | 
+     repeat block until exp | 
+     if exp then block { elseif exp then block } [ else block ] end | 
+     for Name `=´ exp `,´ exp [ `,´ exp ] do block end |
+     for namelist in explist do block end |
+     function funcname funcbody |
+     local function Name funcbody |
+     local namelist [ `=´ explist ]
 
-    laststat ::= return [explist] | break
+laststat ::= return [explist] | break
 
-    funcname ::= Name {`.´ Name} [`:´ Name]
+funcname ::= Name { `.´ Name } [ `:´ Name ]
 
-    varlist ::= var {`,´ var}
+varlist ::= var { `,´ var }
 
-    var ::=  Name | prefixexp `[´ exp `]´ | prefixexp `.´ Name 
+var ::= exp_front { exp_back | args_back } exp_back | Name
 
-    namelist ::= Name {`,´ Name}
+prefixexp ::= Name { exp_back | args_back } | `(´ exp `)´ { exp_back | args_back }
 
-    explist ::= {exp `,´} exp
+functioncall ::= exp_front { exp_back | args_back } args_back
 
-    exp ::=  nil | false | true | Number | String | `...´ | function | 
-         prefixexp | tableconstructor | exp binop exp | unop exp 
+exp_front ::= Name | `(´ exp `)´
 
-    prefixexp ::= var | functioncall | `(´ exp `)´
+exp_back ::= `[´ exp `]´ | `.´ Name
 
-    functioncall ::=  prefixexp args | prefixexp `:´ Name args 
+args_back ::= args | `:´ Name args
 
-    args ::=  `(´ [explist] `)´ | tableconstructor | String 
+namelist ::= Name { `,´ Name }
 
-    function ::= function funcbody
+explist ::= { exp `,´ } exp
 
-    funcbody ::= `(´ [parlist] `)´ block end
+exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `...´ exp_p | function exp_p | 
+     prefixexp exp_p | tableconstructor exp_p  | unop exp exp_p 
 
-    parlist ::= namelist [`,´ `...´] | `...´
+exp_p ::= binop exp exp_p | epsilon
 
-    tableconstructor ::= `{´ [fieldlist] `}´
+args ::=  `(´ [ explist ] `)´ | tableconstructor | String 
 
-    fieldlist ::= field {fieldsep field} [fieldsep]
+function ::= function funcbody
 
-    field ::= `[´ exp `]´ `=´ exp | Name `=´ exp | exp
+funcbody ::= `(´ [ parlist ] `)´ block end
 
-    fieldsep ::= `,´ | `;´
+parlist ::= namelist [ `,´ `...´ ] | `...´
 
-    binop ::= `+´ | `-´ | `*´ | `/´ | `^´ | `%´ | `..´ | 
-         `<´ | `<=´ | `>´ | `>=´ | `==´ | `~=´ | 
-         and | or
+tableconstructor ::= `{´ [ fieldlist ] `}´
 
-    unop ::= `-´ | not | `#´
+fieldlist ::= field { fieldsep field } [ fieldsep ]
 
-Changes:
-var::=startexp{suffix}followexp|Name
-prefixexp::=Name{suffix}|‘(‘exp‘)’{suffix}
-functioncall::=startexp{suffix}followcall
-Additions:
-startexp::=Name|‘(‘exp‘)’
-followexp::=‘[‘exp‘]’|‘.’Name
-followcall::=args|‘:’Nameargs
-suffix::=followexp|followcall
+field ::= `[´ exp `]´ `=´ exp | Name `=´ exp | exp
+
+fieldsep ::= `,´ | `;´
+
+binop ::= `+´ | `-´ | `*´ | `/´ | `^´ | `%´ | `..´ | 
+     `<´ | `<=´ | `>´ | `>=´ | `==´ | `~=´ | 
+     and | or
+
+unop ::= `-´ | not | `#´
