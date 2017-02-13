@@ -16,8 +16,6 @@ stat ::=  varlist `=´ explist |
 
 laststat ::= return [ explist ] | break
 
-funcname ::= Name { `.´ Name } [ `:´ Name ]
-
 varlist ::= var { `,´ var }
 
 exp_args_back ::= exp_back | args_back
@@ -47,15 +45,18 @@ function ::= function funcbody
 
 funcbody ::= `(´ [ parlist ] `)´ block end
 
-parlist ::= namelist [ `,´ `...´ ] | `...´
-
-namelist ::= Name { `,´ Name }
-
 tableconstructor ::= `{´ [ fieldlist ] `}´
 
 fieldlist ::= field { fieldsep field } [ fieldsep ]
 
 field ::= `[´ exp `]´ `=´ exp | Name `=´ exp | exp
+
+
+funcname ::= Name { `.´ Name } [ `:´ Name ]
+
+namelist ::= Name { `,´ Name }
+
+parlist ::= namelist [ `,´ `...´ ] | `...´
 
 fieldsep ::= `,´ | `;´
 

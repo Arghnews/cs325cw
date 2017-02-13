@@ -13,9 +13,9 @@ def tokenize(code):
             "repeat","return","then","true","until","while"]
     keywords_regex = (r'|').join(word for word in keywords)
 
-    operators = ['\+','\-','\*','\/','\%','\^','\#','\==','\~=',
-            '\<=','\>=','\<','\>','\=','\(','\)','\{','\}','\[',
-            '\]','\;','\:','\,','\...','\..','\.',]
+    operators = ['\+','-','\*','g','%','\^','#','==','~=',
+            '<=','>=','<','>','=','\(','\)','\{','\}','\[',
+            '\]',';',':',',','\.\.\.','\.\.','\.',]
     operators_regex = (r'|').join(word for word in operators)
 
     #inty = r'asd'
@@ -115,6 +115,31 @@ def parse(fname):
     i, tokens = parlist(i, tokens)
     print("Parlist 2",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
+    i_b = i
+    i, tokens = binop(i, tokens)
+    print("Binop",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = unop(i, tokens)
+    print("Unop",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = fieldsep(i, tokens)
+    print("Fieldsep",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+    i_b = i
+    i, tokens = funcname(i, tokens)
+    print("funcname",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+
+
+
+def funcname(i, tokens):
+    i, tokens = matchTypeNow(i,tokens,"Name")
+    i, tokens = star(i, tokens, [(".",MATCH_VALUE), ("Name",MATCH_TYPE)], 2)
+    i, tokens = optional(i, tokens, [(":",MATCH_VALUE), ("Name",MATCH_TYPE)], 2)
+    return i, tokens
+
 def parlist(i, tokens):
     # chosen the ... only
     if lookahead(i, tokens, [("...",MATCH_VALUE)], 1):
@@ -123,7 +148,6 @@ def parlist(i, tokens):
     elif lookahead(i, tokens, [("Name",MATCH_TYPE)], 1):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 2)
-
     else:
         print("This is not the parlist you've been looking for")
     
@@ -132,6 +156,40 @@ def parlist(i, tokens):
 def namelist(i, tokens):
     i, tokens = matchTypeNow(i,tokens,"Name")
     i, tokens = star(i, tokens, [(",",MATCH_VALUE), ("Name",MATCH_TYPE)], 2)
+    return i, tokens
+
+def binop(i, tokens):
+    binop_list = ['+', '-', '*', '/', '^', '%', '..', '<', '<=', '>', '>=', '==', '~=', 'and', 'or']
+    return matchTerminalListError(i, tokens, binop_list, "Could not find binary")
+
+def unop(i, tokens):
+    unop_list = ['-', 'not', '#']
+    return matchTerminalListError(i, tokens, unop_list, "Could not find unary operator")
+
+def fieldsep(i, tokens):
+    fieldsep_list = [',', ';']
+    return matchTerminalListError(i, tokens, fieldsep_list, "Could not find field separator")
+
+
+
+
+
+
+
+
+
+def matchTerminalListError(i, tokens, list, err):
+    i_b = i
+    i, tokens = matchTerminalInList(i, tokens, list)
+    if i == i_b:
+        print(err)
+    return i, tokens
+
+def matchTerminalInList(i, tokens, list):
+    for op in list:
+        if lookahead(i, tokens, [(op,MATCH_VALUE)], 1):
+            i, tokens = matchValueNow(i, tokens, op)
+            break
     return i, tokens
 
 def matchTypeNow(i, tokens, type):
