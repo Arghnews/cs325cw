@@ -20,11 +20,13 @@ funcname ::= Name { `.´ Name } [ `:´ Name ]
 
 varlist ::= var { `,´ var }
 
-var ::= exp_front { exp_back | args_back } exp_back | Name
+exp_args_back ::= exp_back | args_back
 
-prefixexp ::= Name { exp_back | args_back } | `(´ exp `)´ { exp_back | args_back }
+var ::= exp_front { exp_args_back } exp_back | Name
 
-functioncall ::= exp_front { exp_back | args_back } args_back
+prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
+
+functioncall ::= exp_front { exp_args_back } args_back
 
 exp_front ::= Name | `(´ exp `)´
 

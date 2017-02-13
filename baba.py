@@ -93,46 +93,90 @@ def parse(fname):
     tokens = []
     for token in tokenize(program):
         tokens.append(token)
+    # append EOF token
+    EOF = Token("EOF","EOF",tokens[-1].line+1,0)
+    tokens.append(EOF)
 
     for i, t in enumerate(tokens):
         print(i,t)
     print("Now the program starts fo real")
 
     i = 0
+    i_b = i
     i, tokens = namelist(i, tokens)
-    print("After 1")
-    print(tokens[i:])
-    i, tokens = namelist(i, tokens)
-    print("After 2")
-    print(tokens[i:])
+    print("Consumed in namelist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+    #i_b = i
+    #i, tokens = namelist(i, tokens)
+    #print("Consumed in namelist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
-def name(i, tokens):
-    if match_t(tokens[i],"Name"):
-        i += 1
-    return i, tokens
+def matchType(type):
+    def f(i, tokens):
+        if match_t(tokens[i],type):
+            i += 1
+        return i, tokens
+    # for nice error print
+    f.__name__ = type
+    return f
+
+def matchValue(value):
+    def f(i, tokens):
+        if match_v(tokens[i],value):
+            i += 1
+        return i, tokens
+    # for nice error print
+    f.__name__ = value
+    return f
 
 def name_suffix(i, tokens):
-    print("I got passed",tokens[i])
     if match_v(tokens[i],","):
         i += 1
         i, tokens = name(i, tokens)
     else:
         pass
-
     return i, tokens
 
-def star(i, tokens, f):
-    last_i = i
+def star(i, tokens, funcs):
     cont = True
-    while cont and i<len(tokens):
+    while cont:
+        original_i = i
+        for f in funcs:
+            last_i = i
+            i, tokens = f(i, tokens)
+            cont = last_i != i
+            if i == original_i:
+                # fine, not another instance of a in
+                # a*
+                print("Fine return",tokens[i])
+                return original_i, tokens
+            elif not cont:
+                # error, as for a -> b { c d}
+                # got b c q as d != q
+                print("Error, expected ",f.__name__)
+                return original_i, tokens
+    return i, tokens
+
+def optional(i, tokens, funcs):
+    cont = True
+    original_i = i
+    for f in funcs:
         last_i = i
         i, tokens = f(i, tokens)
         cont = last_i != i
+        if i == original_i:
+            # fine, not another instance of a in
+            # a*
+            print("Fine return",tokens[i])
+            return original_i, tokens
+        elif not cont:
+            # error, as for a -> b { c d}
+            # got b c q as d != q
+            print("Error, expected ",f.__name__)
+            return original_i, tokens
     return i, tokens
-    
+
 def namelist(i, tokens):
-    i, tokens = name(i, tokens)
-    i, tokens = star(i, tokens, name_suffix)
+    i, tokens = matchType("Name")(i,tokens)
+    i, tokens = optional(i, tokens, [matchValue(","),matchType("Name")])
     return i, tokens
 
 def match_t(token,type):
