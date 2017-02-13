@@ -116,7 +116,7 @@ def parse(fname):
 
 def namelist(i, tokens):
     i, tokens = matchType("Name")(i,tokens)
-    i, tokens = optional(i, tokens, [(",",MATCH_VALUE), ("Name",MATCH_TYPE)], 2)
+    i, tokens = star(i, tokens, [(",",MATCH_VALUE), ("Name",MATCH_TYPE)], 2)
     return i, tokens
 
 def matchType(type):
