@@ -100,7 +100,7 @@ def error(err):
 
 def parse(fname):
 
-    firstSets["binop"] = [('+',MATCH_VALUE), ('-',MATCH_VALUE), ('*',MATCH_VALUE), ('/',MATCH_VALUE), ('^',MATCH_VALUE), ('%',MATCH_VALUE), '..', ('<',MATCH_VALUE), '<=', ('>',MATCH_VALUE), '>=', '==', '~=', 'and', 'or']
+    firstSets["binop"] = [('+',MATCH_VALUE), ('-',MATCH_VALUE), ('*',MATCH_VALUE), ('/',MATCH_VALUE), ('^',MATCH_VALUE), ('%',MATCH_VALUE), ('..',MATCH_VALUE), ('<',MATCH_VALUE), ('<=',MATCH_VALUE), ('>',MATCH_VALUE), ('>=',MATCH_VALUE), ('==',MATCH_VALUE), ('~=',MATCH_VALUE), ('and',MATCH_VALUE), ('or',MATCH_VALUE)]
     firstSets["unop"] = [('-',MATCH_VALUE), ('not',MATCH_VALUE), ('#',MATCH_VALUE)]
     firstSets["fieldsep"] = [(',',MATCH_VALUE), (';',MATCH_VALUE)]
     firstSets["exp"] = [('nil',MATCH_VALUE),('false',MATCH_VALUE),('true',MATCH_VALUE),('Number', MATCH_TYPE), ('String', MATCH_TYPE), ('...', MATCH_VALUE),('function',MATCH_VALUE),('{',MATCH_VALUE),('Name',MATCH_TYPE),('-',MATCH_VALUE),('not',MATCH_VALUE),('#',MATCH_VALUE)]
