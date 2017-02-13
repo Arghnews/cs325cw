@@ -16,17 +16,14 @@ def tokenize(code):
             "repeat","return","then","true","until","while"]
     keywords_regex = (r'|').join(word for word in keywords)
 
-    operators = ['\+','-','\*','g','%','\^','#','==','~=',
+    operators = ['\+','-','\*','/','%','\^','#','==','~=',
             '<=','>=','<','>','=','\(','\)','\{','\}','\[',
             '\]',';',':',',','\.\.\.','\.\.','\.',]
-    operators_regex = (r'|').join(word for word in operators)
+    operators_regex = (r'|').join(op for op in operators)
 
-    #inty = r'asd'
-    #int2 = r'asdd'
-    #int3 = r'|'.join([inty, int2])
     token_specification = [
             # Order in the Number matters, hex first
-            #("Comment", r'.*--.*'),
+            ("Comment", r'--.*\n'), # only works on single line comment
             ("Number", r'0[xX]([0-9a-fA-F]*)(\.[0-9a-fA-F]+)([pP]-?[0-9]+)?|0[xX]([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?|([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?|([0-9]*)(\.[0-9]+)([eE]-?[0-9]+)?' ),
             ("Name", r'[_a-zA-Z][_a-zA-Z0-9]*'), # should be before keyword
             ("Keyword", keywords_regex),
@@ -38,52 +35,26 @@ def tokenize(code):
             ]
     tok_regex = '|'.join('(?P<%s>%s)' % pair for pair in token_specification)
 
-    line_num = 1
+    line_number = 1
     line_start = 0
     for mo in re.finditer(tok_regex, code):
         kind = mo.lastgroup
         value = mo.group(kind)
         if kind == "Newline":
             line_start = mo.end()
-            line_num += 1
-        elif kind == "Empty": #or kind == "Comment":
+            line_number += 1
+        elif kind == "Empty" or kind == "Comment":
+            print("Matched",value,"as comment")
             pass
         elif kind == 'Error':
-            raise RuntimeError('%r unexpected on line %d' % (value, line_num))
+            raise RuntimeError('%r unexpected on line %d' % (value, line_number))
         else:
             if kind == "String" and value:
                 value = value[1:-1] # remove first and last chars
             elif kind == "Name" and value in keywords:
                 kind = "Keyword" # to convert keywords picked up as names to keywords
             column = mo.start() - line_start
-            yield Token(kind, value, line_num, column)
-
-blablablabla='''
-x = 0x3p3
-print(x)
-
-a = 10
-b = 30
-
-function max(num1, num2)
-
-   if (num1 > num2) then
-      result = num1;
-   else
-      result = num2;
-   end
-
-   return result; 
-end
-
-while( false )
-do
-   print("This loop will run forever.")
-end
-'''
-
-btick = r'`'
-ftick = r'´'
+            yield Token(kind, value, line_number, column)
 
 # used in funcs when telling lookahead func
 # what to look for, ie tuples of ",",MATCH_VALUE
@@ -145,8 +116,6 @@ def parse(fname):
         for line in ins:
             program += line
 
-
-#function max(num1, num2)
     tokens = []
     for token in tokenize(program):
         tokens.append(token)
