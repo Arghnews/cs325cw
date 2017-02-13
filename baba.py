@@ -116,10 +116,10 @@ def parse(fname):
     firstSets["stat"] = firstSets["varlist"] + firstSets["functioncall"] + [('do',MATCH_VALUE), ('while',MATCH_VALUE), ('repeat',MATCH_VALUE), ('if',MATCH_VALUE), ('for',MATCH_VALUE), ('function',MATCH_VALUE), ('local',MATCH_VALUE)]
     firstSets["chunk"] = firstSets["stat"] + firstSets["laststat"] + [('EOF',MATCH_TYPE)]
     firstSets["block"] = firstSets["chunk"]
-    firstSets["exp_back"] = [('[',MATCH_VALUE),('.',MATCH_VALUE)]
-    firstSets["exp_args_back"] = firstSets["exp_back"] + firstSets["args_back"]
     firstSets["args"] = [('(',MATCH_VALUE),('{',MATCH_VALUE),('String',MATCH_TYPE)]
+    firstSets["exp_back"] = [('[',MATCH_VALUE),('.',MATCH_VALUE)]
     firstSets["args_back"] = firstSets["args"] + [(':',MATCH_VALUE)]
+    firstSets["exp_args_back"] = firstSets["exp_back"] + firstSets["args_back"]
     firstSets["explist"] = firstSets["exp"]
     firstSets["tableconstructor"] = [('{',MATCH_VALUE)]
     firstSets["fieldlist"] = [('[',MATCH_VALUE),('Name',MATCH_TYPE)] + firstSets["exp"]
@@ -528,9 +528,6 @@ def contains(i, tokens, firstSet):
 # lookahead function right here
 def lookahead(i, tokens, func_tuples, lookahead_n):
     global errors_switch
-    if errors_switch != 0:
-        return False
-        pass
     errors_switch += 1
     for j in range(0, min(len(func_tuples),lookahead_n)):
         b = False
@@ -539,7 +536,9 @@ def lookahead(i, tokens, func_tuples, lookahead_n):
         elif func_tuples[j][1] == MATCH_TYPE:
             b = match_t(tokens, i+j, func_tuples[j][0])
         elif func_tuples[j][1] == MATCH_FUNCTION:
-            b = i_changed(i+j, tokens, func_tuples[j][0])
+            firstSet = firstSets[func_tuples[j][0].__name__]
+            b = contains(i, tokens, firstSet)
+            #b = i_changed(i+j, tokens, func_tuples[j][0])
         if not b:
             errors_switch -= 1
             return False
