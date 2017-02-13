@@ -8,6 +8,8 @@ import sys
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
 def tokenize(code):
+    code = code.replace("\t"," ")
+    code = code.replace("  "," ")
     keywords = ["and","break","do","else","elseif","end","false",
             "for","function","if","in","local","nil","not","or",
             "repeat","return","then","true","until","while"]
@@ -89,6 +91,13 @@ MATCH_FUNCTION = "function_type"
 
 firstSets = dict()
 
+errors_switch = True
+
+def error(err):
+    global errors_switch
+    if errors_switch:
+        print(err)
+
 def parse(fname):
 
     firstSets["binop"] = [('+',MATCH_VALUE), ('-',MATCH_VALUE), ('*',MATCH_VALUE), ('/',MATCH_VALUE), ('^',MATCH_VALUE), ('%',MATCH_VALUE), '..', ('<',MATCH_VALUE), '<=', ('>',MATCH_VALUE), '>=', '==', '~=', 'and', 'or']
@@ -126,10 +135,16 @@ def parse(fname):
         print(i,t)
     print("Now the program starts fo real")
     i = 0
-    
-    
+
+    i_b = i
+    i, tokens = doIt(i, tokens)
+    print("Output:",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+
+
+def doIt(i, tokens):
     i, tokens = chunk(i, tokens)
-    print("I at:",i)
+    i, tokens = matchTypeNow(i, tokens, "EOF")
+    return i, tokens
 
 def exp_p(i, tokens):
     i, tokens = optional(i, tokens, [(binop,MATCH_FUNCTION),(exp,MATCH_FUNCTION),(exp_p,MATCH_FUNCTION)], 1)
@@ -196,8 +211,11 @@ def stat(i, tokens):
         i, tokens = optional(i, tokens, [("else",MATCH_VALUE),(block,MATCH_FUNCTION)], 1)
         i, tokens = matchValueNow(i, tokens, "end")
     elif contains(i, tokens, [("for",MATCH_VALUE)]):
+        print("Start of for:",tokens[i],i)
         i, tokens = matchValueNow(i, tokens, "for")
         i, tokens = stat_for(i, tokens)
+        print("End of for:",tokens[i],i)
+        error("Ahhhh")
     elif contains(i, tokens, [("function",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "function")
         i, tokens = funcname(i, tokens)
@@ -226,10 +244,13 @@ def block(i, tokens):
     return i, tokens
 
 def chunk(i, tokens):
+    my_i = i
+    print("Chunk called with i as",i,"(",my_i,")")
     i, tokens = star(i, tokens, [(stat,MATCH_FUNCTION),
         (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
     i, tokens = optional(i, tokens, [(laststat,MATCH_FUNCTION),
         (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
+    print("Chunk finishing with i as",i,"(",my_i,")")
     return i, tokens
 
 def laststat(i, tokens):
@@ -400,8 +421,6 @@ def parlist(i, tokens):
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 2)
-    else:
-        print("This is not the parlist you've been looking for")
     
     return i, tokens
 
@@ -474,6 +493,8 @@ def matchValue(value):
 
 # lookahead function right here
 def lookahead(i, tokens, func_tuples, lookahead_n):
+    global errors_switch
+    errors_switch = False
     for j in range(0, min(len(func_tuples),lookahead_n)):
         b = False
         if func_tuples[j][1] == MATCH_VALUE:
@@ -483,7 +504,9 @@ def lookahead(i, tokens, func_tuples, lookahead_n):
         elif func_tuples[j][1] == MATCH_FUNCTION:
             b = i_changed(i+j, tokens, func_tuples[j][0])
         if not b:
+            errors_switch = True
             return False
+    errors_switch = True
     return True
 
 def i_changed(i, tokens, f):
