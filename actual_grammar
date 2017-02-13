@@ -1,6 +1,10 @@
-chunk ::= { stat [`;´] } [ laststat [`;´] ]
+chunk ::= { stat [ `;´ ] } [ laststat [ `;´ ] ]
 
-block ::= chunk
+exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `...´ exp_p | functiondef exp_p | 
+     prefixexp exp_p | tableconstructor exp_p  | unop exp exp_p 
+
+# is this same as [ binop exp exp_p ]
+exp_p ::= [ binop exp exp_p ]
 
 stat ::=  varlist `=´ explist | 
      functioncall | 
@@ -8,21 +12,19 @@ stat ::=  varlist `=´ explist |
      while exp do block end | 
      repeat block until exp | 
      if exp then block { elseif exp then block } [ else block ] end | 
-     for Name `=´ exp `,´ exp [ `,´ exp ] do block end |
-     for namelist in explist do block end |
+     for stat_for |
      function funcname funcbody |
-     local function Name funcbody |
-     local namelist [ `=´ explist ]
+     local stat_local
 
-exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `...´ exp_p | functiondef exp_p | 
-     prefixexp exp_p | tableconstructor exp_p  | unop exp exp_p 
+block ::= chunk
 
-exp_p ::= binop exp exp_p | epsilon
+stat_local ::= function Name funcbody | namelist [ `=´ explist ]
+
+stat_for ::= Name `=´ exp `,´ exp [ `,´ exp ] do block end | namelist in explist do block end
 
 functiondef ::= function funcbody
 
 funcbody ::= `(´ [ parlist ] `)´ block end
-
 
 laststat ::= return [ explist ] | break
 

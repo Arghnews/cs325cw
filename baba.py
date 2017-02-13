@@ -100,6 +100,12 @@ def parse(fname):
     firstSets["exp_back"] = [('[',MATCH_VALUE),('.',MATCH_VALUE)]
     firstSets["args_back"] = firstSets["args"] + [(':',MATCH_VALUE)]
     firstSets["exp_front"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
+    firstSets["functioncall"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
+    firstSets["varlist"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
+    firstSets["stat"] = firstSets["varlist"] + firstSets["functioncall"] + [('do',MATCH_VALUE), ('while',MATCH_VALUE), ('repeat',MATCH_VALUE), ('if',MATCH_VALUE), ('for',MATCH_VALUE), ('function',MATCH_VALUE), ('local',MATCH_VALUE)]
+    firstSets["namelist"] = [('Name',MATCH_TYPE)]
+    firstSets["functiondef"] = [('function',MATCH_VALUE)]
+    firstSets["prefixexp"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
 
     # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
     program = ""
@@ -120,83 +126,111 @@ def parse(fname):
         print(i,t)
     print("Now the program starts fo real")
     i = 0
-
     
-    i_b = i
-    i, tokens = laststat(i, tokens)
-    print("laststat",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-    return
+    
+    i, tokens = chunk(i, tokens)
+    print("I at:",i)
 
-    i_b = i
-    i, tokens = prefixexp(i, tokens)
-    print("prefixexp",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def exp_p(i, tokens):
+    i, tokens = optional(i, tokens, [(binop,MATCH_FUNCTION),(exp,MATCH_FUNCTION),(exp_p,MATCH_FUNCTION)], 1)
+    return i, tokens
 
-    i_b = i
-    i, tokens = varlist(i, tokens)
-    print("varlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-    i_b = i
-    i, tokens = var(i, tokens)
-    print("var",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def stat_for(i, tokens):
+    if contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i+1, tokens, [("=",MATCH_VALUE)]):
+        i, tokens = matchTypeNow(i, tokens, "Name")
+        i, tokens = matchValueNow(i, tokens, "=")
+        i, tokens = exp(i, tokens)
+        i, tokens = matchValueNow(i, tokens, ",")
+        i, tokens = exp(i, tokens)
+        i, tokens = optional(i, tokens, [(",",MATCH_VALUE),(exp,MATCH_FUNCTION)], 1)
+        i, tokens = matchValueNow(i, tokens, "do")
+        i, tokens = block(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "end")
+    elif contains(i, tokens, firstSets["namelist"]) and contains(i+1, tokens, [(",",MATCH_VALUE),("in",MATCH_VALUE)]):
+        i, tokens = namelist(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "in")
+        i, tokens = explist(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "do")
+        i, tokens = block(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "end")
+    return i, tokens
 
-    i_b = i
-    i, tokens = functioncall(i, tokens)
-    print("functioncall",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def stat_local(i, tokens):
+    if contains(i, tokens, [("function",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "function")
+        i, tokens = matchTypeNow(i, tokens, "Name")
+        i, tokens = funcbody(i, tokens)
+    elif contains(i, tokens, firstSets["namelist"]):
+        i, tokens = namelist(i, tokens)
+        i, tokens = optional(i, tokens,[("=",MATCH_VALUE),(explist,MATCH_FUNCTION)], 1)
+    return i, tokens
 
-    i_b = i
-    i, tokens = exp_args_back(i, tokens)
-    print("exp_args_back",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def stat(i, tokens):
+    if contains(i, tokens, firstSets["varlist"]):
+        i, tokens = varlist(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "=")
+        i, tokens = explist(i, tokens)
+    elif contains(i, tokens, firstSets["functioncall"]):
+        i, tokens = functioncall(i, tokens)
+    elif contains(i, tokens, [("do",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "do")
+        i, tokens = matchValueNow(i, tokens, "block")
+        i, tokens = matchValueNow(i, tokens, "end")
+    elif contains(i, tokens, [("while",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "while")
+        i, tokens = exp(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "do")
+        i, tokens = block(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "end")
+    elif contains(i, tokens, [("repeat",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "repeat")
+        i, tokens = block(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "until")
+        i, tokens = exp(i, tokens)
+    elif contains(i, tokens, [("if",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "if")
+        i, tokens = exp(i, tokens)
+        i, tokens = matchValueNow(i, tokens, "then")
+        i, tokens = block(i, tokens)
+        i, tokens = star(i, tokens, [("elseif",MATCH_VALUE),(exp,MATCH_FUNCTION),("then",MATCH_VALUE),(block,MATCH_FUNCTION)], 1)
+        i, tokens = optional(i, tokens, [("else",MATCH_VALUE),(block,MATCH_FUNCTION)], 1)
+        i, tokens = matchValueNow(i, tokens, "end")
+    elif contains(i, tokens, [("for",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "for")
+        i, tokens = stat_for(i, tokens)
+    elif contains(i, tokens, [("function",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "function")
+        i, tokens = funcname(i, tokens)
+        i, tokens = funcbody(i, tokens)
+    elif contains(i, tokens, [("local",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "local")
+        i, tokens = stat_local(i, tokens)
+    
+    return i, tokens
 
-    i_b = i
-    i, tokens = exp_front(i, tokens)
-    print("exp_front",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def functiondef(i, tokens):
+    i, tokens = matchValueNow(i, tokens, "function")
+    i, tokens = funcbody(i, tokens)
+    return i, tokens
 
-    i_b = i
-    i, tokens = exp_back(i, tokens)
-    print("exp_back",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def funcbody(i, tokens):
+    i, tokens = matchValueNow(i, tokens, "(")
+    i, tokens = optional(i, tokens, [(parlist,MATCH_FUNCTION)], 1)
+    i, tokens = matchValueNow(i, tokens, ")")
+    i, tokens = block(i, tokens)
+    i, tokens = matchValueNow(i, tokens, "end")
+    return i, tokens
 
-    i_b = i
-    i, tokens = args_back(i, tokens)
-    print("args_back",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def block(i, tokens):
+    i, tokens = chunk(i, tokens)
+    return i, tokens
 
-    i_b = i
-    i, tokens = parlist(i, tokens)
-    print("Consumed in parlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = parlist(i, tokens)
-    print("Parlist 2",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = binop(i, tokens)
-    print("Binop",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = unop(i, tokens)
-    print("Unop",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = fieldsep(i, tokens)
-    print("Fieldsep",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = funcname(i, tokens)
-    print("funcname",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = field(i, tokens)
-    print("field",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = fieldlist(i, tokens)
-    print("fieldlist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    i_b = i
-    i, tokens = tableconstructor(i, tokens)
-    print("tableconstructor",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
-
-    #i_b = i
-    #i, tokens = explist(i, tokens)
-    #print("explist",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
+def chunk(i, tokens):
+    i, tokens = star(i, tokens, [(stat,MATCH_FUNCTION),
+        (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
+    i, tokens = optional(i, tokens, [(laststat,MATCH_FUNCTION),
+        (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
+    return i, tokens
 
 def laststat(i, tokens):
     if contains(i, tokens, [("return",MATCH_VALUE)]):
@@ -317,10 +351,40 @@ def field(i, tokens):
     elif contains(i, tokens, firstSets["exp"]):
         i, tokens = exp(i, tokens)
     return i, tokens
-    
+
 def exp(i, tokens):
-    return matchTypeNow(i,tokens,"String")
-    #return i, tokens
+    if contains(i, tokens, [("nil",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "nil")
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, [("false",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "false")
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, [("true",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "true")
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, [("Number",MATCH_TYPE)]):
+        i, tokens = matchTypeNow(i, tokens, "Number")
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, [("String",MATCH_TYPE)]):
+        i, tokens = matchTypeNow(i, tokens, "String")
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, [("...",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "...")
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, firstSets["functiondef"]):
+        i, tokens = functiondef(i, tokens)
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, firstSets["prefixexp"]):
+        i, tokens = prefixexp(i, tokens)
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, firstSets["tableconstructor"]):
+        i, tokens = tableconstructor(i, tokens)
+        i, tokens = exp_p(i, tokens)
+    elif contains(i, tokens, firstSets["unop"]):
+        i, tokens = unop(i, tokens)
+        i, tokens = exp(i, tokens)
+        i, tokens = exp_p(i, tokens)
+    return i, tokens
 
 def funcname(i, tokens):
     i, tokens = matchTypeNow(i,tokens,"Name")
@@ -356,12 +420,6 @@ def unop(i, tokens):
 def fieldsep(i, tokens):
     fieldsep_list = [',', ';']
     return matchTerminalInList(i, tokens, firstSets["fieldsep"])
-
-
-
-
-
-
 
 
 
@@ -462,6 +520,11 @@ def something(i, tokens, func_tuples, lookahead_n, repeater):
                 break
 
     return i, tokens
+
+def optional_curry(func_tuples, lookahead):
+    def f(i, tokens):
+        return something(i, tokens, func_tuples, lookahead, optional_do)
+    return f
 
 def optional(i, tokens, func_tuples, lookahead):
     return something(i, tokens, func_tuples, lookahead, optional_do)
