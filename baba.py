@@ -127,7 +127,9 @@ def tokenize(code):
         if kind == "Newline":
             line_start = mo.end()
             line_number += 1
-        elif kind == "Empty" or kind == "Comment":
+        elif kind == "Comment":
+            line_number += 1
+        elif kind == "Empty":
             pass
         elif kind == 'Error':
             raise RuntimeError('%r unexpected on line %d, could not interpret token' % (value, line_number))
@@ -139,14 +141,14 @@ def tokenize(code):
                 num_square_brackets = 0
                 prefix_suffix = 0
                 for v in value:
+                    if v == '\n':
+                        line_number += 1
+                for v in value:
                     prefix_suffix += 1
                     if v == "[":
                         num_square_brackets += 1
                     if num_square_brackets == 2:
                         value = value[prefix_suffix:]
-                        # strip newline if first char
-                        if value[0] == '\n':
-                            value = value[1:]
                         break
 
                 # strip ]==] from end of long string
@@ -155,6 +157,7 @@ def tokenize(code):
                 pass
             elif kind == "Name" and value in keywords:
                 kind = "Keyword" # to convert keywords picked up as names to keywords
+
             column = mo.start() - line_start
             yield Token(kind, value, line_number, column)
 
