@@ -110,7 +110,10 @@ def log_params(start_i, end_i):
 def error(*err):
     global errors_switch
     if errors_switch == 0:
-        print(err)
+        s = ""
+        for item in err:
+            s += item
+        print("Error:",s)
 
 # why predictive parsing, faster
 
@@ -718,14 +721,14 @@ def match_t(tokens,i,type):
     #error("Type:Trying to match",tokens[i].type,"to",type)
     b = i >= 0 and i < len(tokens) and tokens[i].type == type
     if not b:
-        error("Expected-type",type," but got ",tokens[i].value," of type ",tokens[i].type)
+        error("Expected-type '",type,"' but got '",tokens[i].value,"' of type '",tokens[i].type,"'")
     return b
 
 def match_v(tokens,i,val):
     #error("Val:Trying to match",tokens[i].value,"to",val)
     b = i >= 0 and i < len(tokens) and tokens[i].value == val
     if not b:
-        error("Expected-value",val," but got ",tokens[i].value)
+        error("Expected-value '",val,"' but got '",tokens[i].value,"'")
     return b
 
 if __name__ == "__main__":
