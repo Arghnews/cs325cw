@@ -33,6 +33,7 @@ prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
 varlist ::= var { `,´ var }
 
 var ::= exp_front { exp_args_back } exp_back | Name
+#var ::= exp_front { exp_args_back }
 
 functioncall ::= exp_front { exp_args_back } args_back
 

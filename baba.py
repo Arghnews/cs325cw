@@ -117,6 +117,7 @@ def parse(fname):
     firstSets["fieldsep"] = [(',',MATCH_VALUE), (';',MATCH_VALUE)]
     firstSets["unop"] = [('-',MATCH_VALUE), ('not',MATCH_VALUE), ('#',MATCH_VALUE)]
     firstSets["exp_p"] = firstSets["namelist"] +firstSets["fieldsep"] + firstSets["laststat"] + firstSets["binop"] + [('do',MATCH_VALUE),('then',MATCH_VALUE),(',',MATCH_VALUE),(')',MATCH_VALUE),(']',MATCH_VALUE),(';',MATCH_VALUE),("EOF",MATCH_TYPE),('until',MATCH_VALUE),('end',MATCH_VALUE),('else',MATCH_VALUE),('elseif',MATCH_VALUE),('}',MATCH_VALUE),('function',MATCH_VALUE) ]
+    # follow(exp) = firstSets["exp_p"] - firstSets["binop"]
 
     ## add followset of stat to exp_p
     ## add followset of chunk to exp_p
@@ -162,7 +163,6 @@ def exp_p(i, tokens):
 def stat_for(i, tokens):
     if contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i+1, tokens, [("=",MATCH_VALUE)]):
         i, tokens = matchTypeNow(i, tokens, "Name")
-        print("Equals in stat_for, Name",i)
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
         i, tokens = matchValueNow(i, tokens, ",")
@@ -194,14 +194,15 @@ def stat(i, tokens):
     global varnames
     global expnames
     global recent_parameter_list
-    if contains(i, tokens, firstSets["varlist"]) and contains(i+1, tokens, [("=",MATCH_VALUE), ("[",MATCH_VALUE), (",",MATCH_VALUE)]):
-        #print("Hi from inside first varist",i)
+    print("In stat",i)
+    if contains(i, tokens, firstSets["varlist"]) and contains(i+1, tokens, firstSets["exp_args_back"]+firstSets["exp"]+[(",",MATCH_VALUE),("=",MATCH_VALUE)]):
+        print("Hi from inside first varlist",i)
         original_i = i
         i, tokens = varlist(i, tokens)
-        #print("Hi the VARNAMES is :::::::::",varnames)
+        print("Hi the VARNAMES is :::::::::",varnames)
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = explist(i, tokens)
-        #print("Hi the EXPLIST is ;;;;;;;;;",expnames)
+        print("Hi the EXPLIST is ;;;;;;;;;",expnames)
         for j, (a,b) in enumerate(expnames):
             if a == -1 and b == -1:
                 recent_parameter_list.insert( j , (-1,-1) )
@@ -265,6 +266,9 @@ def stat(i, tokens):
     elif contains(i, tokens, [("local",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "local")
         i, tokens = stat_local(i, tokens)
+    else:
+        #error("Error in statement",tokens[i])
+        pass
     
     return i, tokens
 
@@ -289,8 +293,10 @@ def block(i, tokens):
 
 def chunk(i, tokens):
     my_i = i
+    print("In chunk, calling stat star")
     i, tokens = star(i, tokens, [(stat,MATCH_FUNCTION),
         (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
+    print("Finished chunk star of stat")
     i, tokens = optional(i, tokens, [(laststat,MATCH_FUNCTION),
         (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
     return i, tokens
@@ -324,19 +330,25 @@ def varlist(i, tokens):
 def var(i, tokens):
     global varnames
     original_i = i
-    if contains(i, tokens, firstSets["exp_front"]):
-        i, tokens = exp_front(i, tokens)
-        i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
-        i, tokens = exp_back(i, tokens)
-    elif contains(i, tokens, [("Name",MATCH_TYPE)]):
+    print("In var")
+    if contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i+1, tokens, [(",", MATCH_VALUE), ("=", MATCH_VALUE)]):
+        print("I'm actually never picked - kappa")
         i, tokens = matchTypeNow(i, tokens, "Name")
+    elif contains(i, tokens, firstSets["exp_front"]):
+        print("In var, matched exp_front")
+        i, tokens = exp_front(i, tokens)
+        print("Done exp_front",i)
+        i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+        print("Done exp_front",i)
+        i, tokens = exp_back(i, tokens)
+        print("Done exp_back that never happens, see i",i)
     varnames.append( (original_i,i) ) # note down the variable
     return i, tokens
 
 def functioncall(i, tokens):
     i, tokens = exp_front(i, tokens)
     i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
-    i, tokens = args_back(i, tokens)
+    #i, tokens = args_back(i, tokens)
     return i, tokens
 
 def exp_args_back(i, tokens):
@@ -537,6 +549,9 @@ def matchValue(value):
     return f
 
 def contains(i, tokens, firstSet):
+    global errors_switch
+    errors_switch += 1
+    # don't want errors printed here as checking
     for _, (val,match_type) in enumerate(firstSet):
         b = False
         if match_type == MATCH_VALUE:
@@ -544,7 +559,9 @@ def contains(i, tokens, firstSet):
         elif match_type == MATCH_TYPE:
             b = match_t(tokens, i, val)
         if b:
+            errors_switch -= 1
             return True
+    errors_switch -= 1
     return False
 
 # lookahead function right here
@@ -583,6 +600,7 @@ def something(i, tokens, func_tuples, lookahead_n, repeater):
         for i, tokens in repeater(i, tokens, funcs):
             if not lookahead(i, tokens, func_tuples, lookahead_n):
                 break
+    # we always break instantly according to printouts?
 
     return i, tokens
 
@@ -618,10 +636,15 @@ def star(i, tokens, func_tuples, lookahead):
     return i, tokens
 
 def match_t(tokens,i,type):
+    error("Type:Trying to match",tokens[i].type,"to",type)
     return i >= 0 and i < len(tokens) and tokens[i].type == type
 
 def match_v(tokens,i,val):
-    return i >= 0 and i < len(tokens) and tokens[i].value == val
+    error("Val:Trying to match",tokens[i].value,"to",val)
+    b = i >= 0 and i < len(tokens) and tokens[i].value == val
+    if not b:
+        error("Expected",val," but got ",tokens[i].value)
+    return b
 
 if __name__ == "__main__":
     parse(sys.argv[1])
