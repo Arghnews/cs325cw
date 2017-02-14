@@ -8,7 +8,7 @@ exp_p ::= [ binop exp exp_p ]
 
 stat ::= 
      Name { exp_args_back } stat_name |
-     `(´ exp `)´ { exp_args_back } stat_func_exp |
+     `(´ exp `)´ { exp_args_back } stat_name_eap |
 ##
 ##
      do block end | 
@@ -24,9 +24,6 @@ stat_name ::= stat_name_eap | end_explist
 
 stat_name_eap ::= exp_back end_explist |
                   args_back
-
-stat_func_exp ::= exp_back end_explist |
-                  args_back
 ##
 
 end_explist ::= { `,´ var } `=´ explist
@@ -34,9 +31,6 @@ end_explist ::= { `,´ var } `=´ explist
 prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
 
 var ::= exp_front { exp_args_back } exp_back | Name
-
-# to delete
-functioncall ::= exp_front { exp_args_back } args_back
 
 exp_args_back ::= exp_back | args_back
 

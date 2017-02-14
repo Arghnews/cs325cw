@@ -1,6 +1,2 @@
-
-function b(askdjas)
+function f1(a1)
 end
-
-a = function(asd) end
-b = 3
