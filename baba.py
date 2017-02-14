@@ -77,6 +77,8 @@ expnames = []
 recent_parameter_list = []
 # stack of tuples that are the args
 
+function_list = []
+
 def error(*err):
     global errors_switch
     if errors_switch == 0:
@@ -143,6 +145,8 @@ def parse(fname):
 
     i_b = i
     i, tokens = doIt(i, tokens)
+    for f in function_list:
+        print(f)
     print("Output:",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
 
@@ -180,9 +184,7 @@ def stat_local(i, tokens):
     if contains(i, tokens, [("function",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "function")
         i, tokens = matchTypeNow(i, tokens, "Name")
-        error("Going from stat_local to funcbody",i)
         i, tokens = funcbody(i, tokens)
-        error("Returned from funcbody, to stat_local",i)
     elif contains(i, tokens, firstSets["namelist"]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens,[("=",MATCH_VALUE),(explist,MATCH_FUNCTION)], 1)
@@ -192,7 +194,6 @@ def stat(i, tokens):
     global varnames
     global expnames
     global recent_parameter_list
-    print("HI we're in stat",i)
     if contains(i, tokens, firstSets["varlist"]) and contains(i+1, tokens, [("=",MATCH_VALUE), ("[",MATCH_VALUE), (",",MATCH_VALUE)]):
         #print("Hi from inside first varist",i)
         original_i = i
@@ -217,7 +218,8 @@ def stat(i, tokens):
                         name_str += tokens[k].value
                     for k in range(params[0], params[1]):
                         args_str += tokens[k].value
-                    print(name_str,args_str)
+                    s = name_str,args_str
+                    function_list.append(s)
         except IndexError:
             error("Could not parse the function header")
         varnames = []
@@ -270,22 +272,15 @@ def functiondef(i, tokens):
     original_i = i
     i, tokens = matchValueNow(i, tokens, "function")
     # to find a = function(b) end
-    if match_v(tokens, original_i-1, "="):
-        # if an equals behind us
-        print("fooe AHA HAHA HAH SO APPEASING\n\n\n\n")
-    error("Going from func def to funcbody",i)
     i, tokens = funcbody(i, tokens)
-    error("Back from funcbody to func def",i)
     return i, tokens
 
 def funcbody(i, tokens):
-    error("Entered funcbody",i)
     i, tokens = matchValueNow(i, tokens, "(")
     i, tokens = optional(i, tokens, [(parlist,MATCH_FUNCTION)], 1)
     i, tokens = matchValueNow(i, tokens, ")")
     i, tokens = block(i, tokens)
     i, tokens = matchValueNow(i, tokens, "end")
-    error("Leaving funcbody",i)
     return i, tokens
 
 def block(i, tokens):
@@ -294,12 +289,10 @@ def block(i, tokens):
 
 def chunk(i, tokens):
     my_i = i
-    error("Chunk called with i as",i,"(",my_i,")")
     i, tokens = star(i, tokens, [(stat,MATCH_FUNCTION),
         (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
     i, tokens = optional(i, tokens, [(laststat,MATCH_FUNCTION),
         (optional_curry([(";",MATCH_VALUE)],1),MATCH_FUNCTION)], 1)
-    error("Chunk finishing with i as",i,"(",my_i,")")
     return i, tokens
 
 def laststat(i, tokens):
@@ -324,11 +317,8 @@ def prefixexp(i, tokens):
 
 def varlist(i, tokens):
     original_i = i
-    print("In a varlist",i)
     i, tokens = var(i, tokens)
-    print("First mandatory var is",original_i,tokens[original_i])
     i, tokens = star(i, tokens, [(",",MATCH_VALUE),(var,MATCH_FUNCTION)], 2)
-    print("End of varlist",i)
     return i, tokens
 
 def var(i, tokens):
@@ -367,14 +357,9 @@ def exp_front(i, tokens):
 
 def exp_back(i, tokens):
     if contains(i, tokens, [("[",MATCH_VALUE)]):
-        print("\n")
-        print("In exp back start",tokens[i],i)
         i, tokens = matchValueNow(i, tokens, "[")
-        print("In exp back matched [",tokens[i],i)
         i, tokens = exp(i, tokens)
-        print("In exp back exp",tokens[i],i)
         i, tokens = matchValueNow(i, tokens, "]")
-        print("In exp_back leaving",tokens[i],i)
     elif contains(i, tokens, [(".",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, ".")
         i, tokens = matchTypeNow(i, tokens, "Name")
@@ -401,11 +386,8 @@ def args(i, tokens):
     return i, tokens
 
 def explist(i, tokens):
-    error("Starting explist",i)
     i, tokens = exp(i, tokens)
-    error("In explist, done with first exp",i)
     i, tokens = star(i, tokens, [(",",MATCH_VALUE),(exp,MATCH_FUNCTION)], 2)
-    error("Leaving explist",i)
     return i, tokens
 
 def tableconstructor(i, tokens):
@@ -427,12 +409,10 @@ def field(i, tokens):
         i, tokens = matchValueNow(i, tokens, "[")
         i, tokens = exp(i, tokens)
         i, tokens = matchValueNow(i, tokens, "]")
-        print("Equals in field, in [",i)
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = matchTypeNow(i, tokens, "Name")
-        print("Equals in field, in Name",i)
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
     elif contains(i, tokens, firstSets["exp"]):
@@ -441,7 +421,6 @@ def field(i, tokens):
 
 def exp(i, tokens):
     global expnames
-    error("Starting exp",i)
     isFunc = False
     original_i = i
     if contains(i, tokens, [("nil",MATCH_VALUE)]):
@@ -464,10 +443,8 @@ def exp(i, tokens):
         i, tokens = exp_p(i, tokens)
     elif contains(i, tokens, firstSets["functiondef"]):
         isFunc = True
-        print("Start of func in exp list",i)
         i, tokens = functiondef(i, tokens)
         funcEnd_i = i
-        print("Func defined in exp list",i)
         i, tokens = exp_p(i, tokens)
     elif contains(i, tokens, firstSets["prefixexp"]):
         i, tokens = prefixexp(i, tokens)
@@ -483,8 +460,6 @@ def exp(i, tokens):
         expnames.append( (original_i,funcEnd_i) )
     else:
         expnames.append( (-1,-1) )
-    error("Returning from exp",i)
-    #traceback.print_exc()
     return i, tokens
 
 def funcname(i, tokens):
@@ -504,7 +479,6 @@ def parlist(i, tokens):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 2)
     recent_parameter_list.append( (i_b,i) )
-    print("Function:",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
     
     return i, tokens
 
@@ -527,8 +501,6 @@ def fieldsep(i, tokens):
 def matchTerminalListError(i, tokens, list, err):
     i_b = i
     i, tokens = matchTerminalInList(i, tokens, list)
-    #if i == i_b:
-        #error(err)
     return i, tokens
 
 def matchTerminalInList(i, tokens, list):
@@ -540,16 +512,10 @@ def matchTerminalInList(i, tokens, list):
 
 def matchTypeNow(i, tokens, type):
     b = matchType(type)(i,tokens)
-    if b:
-        #print("Matched",i," to ",type)
-        pass
     return b
 
 def matchValueNow(i, tokens, value):
     b = matchValue(value)(i,tokens)
-    if b:
-        #print("Matched",i," to ",value)
-        pass
     return b
 
 def matchType(type):
