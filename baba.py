@@ -65,19 +65,24 @@ firstSets = dict()
 
 errors_switch = 0
 
-varnames = []
-# list of tuples that are to id this case
-# of function names for lambdas
-    #a, b = function(argy1) end, function(argy2) end
-    #[(a_start, a_end), (b_start, b_end)]
+ANON = -1
+# anonymous func in tuple list, obv.
+# i can never be -1
 
-expnames = []
-# same as above for expressions
+ANONYMOUS_FUNCTION = "Anonymous function"
+# pretty print for anonymous function
 
-recent_parameter_list = []
-# stack of tuples that are the args
+function_name_list = []
+function_params_list = []
+# both of these are tuples that are the things named
 
-function_list = []
+def log_function_name(start_i, end_i):
+    global function_name_list
+    function_name_list.append( (start_i, end_i) )
+
+def log_params(start_i, end_i):
+    global function_params_list
+    function_params_list.append( (start_i, end_i) )
 
 def error(*err):
     global errors_switch
@@ -147,11 +152,34 @@ def parse(fname):
 
     i_b = i
     i, tokens = doIt(i, tokens)
-    print("Size of function_list",len(function_list))
-    for f in function_list:
-        print(f)
     print("Output:",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
+    if len(function_name_list) != len(function_params_list):
+        # we're screwed, errors so function declares and
+        # func params don't line up, so we don't know
+        pass
+    else:
+        print("Printing functions")
+        n = len(function_name_list)
+        for j in range(0, n):
+            f_name = ""
+            params = ""
+            if function_name_list[j][0] == ANON and function_name_list[j][1] == ANON:
+                # anon function
+                f_name += ANONYMOUS_FUNCTION
+            else:
+                for k in range(function_name_list[j][0],
+                        function_name_list[j][1]):
+                    f_name += tokens[k].value
+
+            params += "("
+            for k in range(function_params_list[j][0],
+                    function_params_list[j][1]):
+                params += tokens[k].value
+            params += ")"
+            print(f_name,params)
+    #function_name_list = []
+    #function_params_list = []
 
 def doIt(i, tokens):
     i, tokens = chunk(i, tokens)
@@ -185,40 +213,14 @@ def stat_for(i, tokens):
 def stat_local(i, tokens):
     if contains(i, tokens, [("function",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "function")
+        i_b = i
         i, tokens = matchTypeNow(i, tokens, "Name")
+        log_function_name(i_b,i)
         i, tokens = funcbody(i, tokens)
     elif contains(i, tokens, firstSets["namelist"]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens,[("=",MATCH_VALUE),(explist,MATCH_FUNCTION)], 1)
     return i, tokens
-
-def addFunctionNames(tokens):
-    global varnames
-    global expnames
-    global recent_parameter_list
-    for j, (a,b) in enumerate(expnames):
-        if a == -1 and b == -1:
-            recent_parameter_list.insert( j , (-1,-1) )
-    #print("HI the func args are -------",recent_parameter_list)
-    try:
-        n = len(varnames)
-        for j in range(0, n):
-            if expnames[j][0] != -1:
-                varname = varnames[j]
-                params = recent_parameter_list[j]
-                name_str = ""
-                args_str = ""
-                for k in range(varname[0], varname[1]):
-                    name_str += tokens[k].value
-                for k in range(params[0], params[1]):
-                    args_str += tokens[k].value
-                s = name_str,args_str
-                function_list.append(s)
-    except IndexError:
-        error("Could not parse the function header")
-    varnames = []
-    expnames = []
-    recent_parameter_list = []
 
 def stat_name(i, tokens):
     print("Welcome to the real world of stat_name",i)
@@ -249,9 +251,6 @@ def end_explist(i, tokens):
     return i, tokens
 
 def stat(i, tokens):
-    global varnames
-    global expnames
-    global recent_parameter_list
     print("In stat",i)
     if contains(i, tokens, [("Name",MATCH_TYPE)]):
         print("In name in stat",i)
@@ -299,8 +298,7 @@ def stat(i, tokens):
         i, tokens = matchValueNow(i, tokens, "function")
         i_b = i
         i, tokens = funcname(i, tokens)
-        varnames.append( (i_b,i) )
-        expnames.append( (0,0) )
+        log_function_name(i_b, i)
         i, tokens = funcbody(i, tokens)
     elif contains(i, tokens, [("local",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "local")
@@ -312,9 +310,8 @@ def stat(i, tokens):
     return i, tokens
 
 def functiondef(i, tokens):
-    original_i = i
     i, tokens = matchValueNow(i, tokens, "function")
-    # to find a = function(b) end
+    log_function_name(ANON, ANON)
     i, tokens = funcbody(i, tokens)
     return i, tokens
 
@@ -365,7 +362,6 @@ def prefixexp(i, tokens):
     return i, tokens
 
 def var(i, tokens):
-    global varnames
     original_i = i
     print("In var")
     if contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i+1, tokens, [(",", MATCH_VALUE), ("=", MATCH_VALUE)]):
@@ -379,7 +375,6 @@ def var(i, tokens):
         print("Done exp_front",i)
         i, tokens = exp_back(i, tokens)
         print("Done exp_back that never happens, see i",i)
-    varnames.append( (original_i,i) ) # note down the variable
     return i, tokens
 
 def exp_args_back(i, tokens):
@@ -480,9 +475,6 @@ def field(i, tokens):
     return i, tokens
 
 def exp(i, tokens):
-    global expnames
-    isFunc = False
-    original_i = i
     if contains(i, tokens, [("nil",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "nil")
         i, tokens = exp_p(i, tokens)
@@ -502,9 +494,7 @@ def exp(i, tokens):
         i, tokens = matchValueNow(i, tokens, "...")
         i, tokens = exp_p(i, tokens)
     elif contains(i, tokens, firstSets["functiondef"]):
-        isFunc = True
         i, tokens = functiondef(i, tokens)
-        funcEnd_i = i
         i, tokens = exp_p(i, tokens)
     elif contains(i, tokens, firstSets["prefixexp"]):
         i, tokens = prefixexp(i, tokens)
@@ -516,10 +506,6 @@ def exp(i, tokens):
         i, tokens = unop(i, tokens)
         i, tokens = exp(i, tokens)
         i, tokens = exp_p(i, tokens)
-    if isFunc:
-        expnames.append( (original_i,funcEnd_i) )
-    else:
-        expnames.append( (-1,-1) )
     return i, tokens
 
 def funcname(i, tokens):
@@ -529,7 +515,6 @@ def funcname(i, tokens):
     return i, tokens
 
 def parlist(i, tokens):
-    global recent_parameter_list
     i_b = i
     # chosen the ... only
     if contains(i, tokens, [("...",MATCH_VALUE)]):
@@ -538,8 +523,7 @@ def parlist(i, tokens):
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 1)
-    recent_parameter_list.append( (i_b,i) )
-    
+    log_params(i_b, i)
     return i, tokens
 
 def namelist(i, tokens):
@@ -686,11 +670,11 @@ def star(i, tokens, func_tuples, lookahead, lookback=0):
     return i, tokens
 
 def match_t(tokens,i,type):
-    error("Type:Trying to match",tokens[i].type,"to",type)
+    #error("Type:Trying to match",tokens[i].type,"to",type)
     return i >= 0 and i < len(tokens) and tokens[i].type == type
 
 def match_v(tokens,i,val):
-    error("Val:Trying to match",tokens[i].value,"to",val)
+    #error("Val:Trying to match",tokens[i].value,"to",val)
     b = i >= 0 and i < len(tokens) and tokens[i].value == val
     if not b:
         error("Expected",val," but got ",tokens[i].value)
