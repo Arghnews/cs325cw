@@ -6,11 +6,8 @@ exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `.
 # is this same as [ binop exp exp_p ]
 exp_p ::= [ binop exp exp_p ]
 
-stat ::= 
-     Name { exp_args_back } stat_name |
-     `(´ exp `)´ { exp_args_back } stat_func_exp |
-##
-##
+stat ::= varlist `=´ explist | 
+     functioncall | 
      do block end | 
      while exp do block end | 
      repeat block until exp | 
@@ -18,35 +15,6 @@ stat ::=
      for stat_for |
      function funcname funcbody |
      local stat_local
-##
-
-stat_name ::= stat_name_eap | end_explist
-
-stat_name_eap ::= exp_back end_explist |
-                  args_back
-
-stat_func_exp ::= exp_back end_explist |
-                  args_back
-##
-
-end_explist ::= { `,´ var } `=´ explist
-
-prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
-
-var ::= exp_front { exp_args_back } exp_back | Name
-
-# to delete
-functioncall ::= exp_front { exp_args_back } args_back
-
-exp_args_back ::= exp_back | args_back
-
-exp_front ::= Name | `(´ exp `)´
-
-exp_back ::= `[´ exp `]´ | `.´ Name
-
-args_back ::= args | `:´ Name args
-
-args ::= `(´ [ explist ] `)´ | tableconstructor | String 
 
 block ::= chunk
 
@@ -59,6 +27,24 @@ functiondef ::= function funcbody
 funcbody ::= `(´ [ parlist ] `)´ block end
 
 laststat ::= return [ explist ] | break
+
+prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
+
+varlist ::= var { `,´ var }
+
+var ::= exp_front { exp_args_back } exp_back | Name
+
+functioncall ::= exp_front { exp_args_back } args_back
+
+exp_args_back ::= exp_back | args_back
+
+exp_front ::= Name | `(´ exp `)´
+
+exp_back ::= `[´ exp `]´ | `.´ Name
+
+args_back ::= args | `:´ Name args
+
+args ::= `(´ [ explist ] `)´ | tableconstructor | String 
 
 explist ::=  exp { `,´ exp }
 
@@ -81,3 +67,12 @@ binop ::= `+´ | `-´ | `*´ | `/´ | `^´ | `%´ | `..´ |
      and | or
 
 unop ::= `-´ | not | `#´
+
+# get rid of varlist by subbing varlist into itself in stat
+# sub var def into var in stat
+# sub exp_front into exp_front in stat
+# factor out name from stat into stat_name
+# factor out (exp) from stat into stat_exp
+
+# problem: stat_name exp_args_back call eats all exp_back/args_back before going into stat_name_eap. solution: stat_name_eap function actually just looks back and decides whether the last thing it ate was an exp_back or args_back and proceeds down the correct path good gOoD gOOOD gOOd
+# when check back, check the lastset exp_back and args_back which are disjoint, the other case is where the * took no transitions ie. none then need check back 1 for Name and if Name then check back another 1 for a ., which means came from exp_back rather than just from the stat function

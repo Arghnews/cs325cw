@@ -117,6 +117,10 @@ def parse(fname):
     firstSets["fieldsep"] = [(',',MATCH_VALUE), (';',MATCH_VALUE)]
     firstSets["unop"] = [('-',MATCH_VALUE), ('not',MATCH_VALUE), ('#',MATCH_VALUE)]
     firstSets["exp_p"] = firstSets["namelist"] +firstSets["fieldsep"] + firstSets["laststat"] + firstSets["binop"] + [('do',MATCH_VALUE),('then',MATCH_VALUE),(',',MATCH_VALUE),(')',MATCH_VALUE),(']',MATCH_VALUE),(';',MATCH_VALUE),("EOF",MATCH_TYPE),('until',MATCH_VALUE),('end',MATCH_VALUE),('else',MATCH_VALUE),('elseif',MATCH_VALUE),('}',MATCH_VALUE),('function',MATCH_VALUE) ]
+    firstSets["end_explist"] = [(",",MATCH_VALUE),("=",MATCH_VALUE)]
+    firstSets["stat_name_eap"] = firstSets["exp_back"] + firstSets["args_back"]
+    firstSets["stat_func_exp"] = firstSets["exp_back"] + firstSets["args_back"]
+    firstSets["stat_name"] = firstSets["stat_name_eap"] + firstSets["end_explist"]
     # follow(exp) = firstSets["exp_p"] - firstSets["binop"]
 
     ## add followset of stat to exp_p
@@ -146,6 +150,7 @@ def parse(fname):
 
     i_b = i
     i, tokens = doIt(i, tokens)
+    print("Size of function_list",len(function_list))
     for f in function_list:
         print(f)
     print("Output:",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
@@ -190,11 +195,94 @@ def stat_local(i, tokens):
         i, tokens = optional(i, tokens,[("=",MATCH_VALUE),(explist,MATCH_FUNCTION)], 1)
     return i, tokens
 
+def addFunctionNames(tokens):
+    global varnames
+    global expnames
+    global recent_parameter_list
+    for j, (a,b) in enumerate(expnames):
+        if a == -1 and b == -1:
+            recent_parameter_list.insert( j , (-1,-1) )
+    #print("HI the func args are -------",recent_parameter_list)
+    try:
+        n = len(varnames)
+        for j in range(0, n):
+            if expnames[j][0] != -1:
+                varname = varnames[j]
+                params = recent_parameter_list[j]
+                name_str = ""
+                args_str = ""
+                for k in range(varname[0], varname[1]):
+                    name_str += tokens[k].value
+                for k in range(params[0], params[1]):
+                    args_str += tokens[k].value
+                s = name_str,args_str
+                function_list.append(s)
+    except IndexError:
+        error("Could not parse the function header")
+    varnames = []
+    expnames = []
+    recent_parameter_list = []
+
+def stat_name(i, tokens):
+    was_exp_back_square = contains(i-1, tokens, [("]",MATCH_VALUE)])
+    was_exp_back_name = contains(i-1, tokens, [("Name",MATCH_TYPE)])
+
+    was_args_back = contains(i-1, tokens, [(")",MATCH_VALUE),("}",MATCH_VALUE),("String",MATCH_TYPE)])
+
+    was_exp_back = (was_exp_back_name and contains(i-2, tokens, [(".",MATCH_VALUE)])) or was_exp_back_square
+
+    if was_exp_back or was_args_back:
+        i, tokens = stat_name_eap(i, tokens)
+    elif contains(i, tokens, firstSets["end_explist"]):
+        i, tokens = end_explist(i, tokens)
+    return i, tokens
+
+def stat_name_eap(i, tokens):
+    was_exp_back_square = contains(i-1, tokens, [("]",MATCH_VALUE)])
+    was_exp_back_name = contains(i-1, tokens, [("Name",MATCH_TYPE)])
+
+    was_args_back = contains(i-1, tokens, [(")",MATCH_VALUE),("}",MATCH_VALUE),("String",MATCH_TYPE)])
+
+    was_exp_back = (was_exp_back_name and contains(i-2, tokens, [(".",MATCH_VALUE)])) or was_exp_back_square
+
+    if was_exp_back:
+        #i, tokens = exp_back(i, tokens)
+        i, tokens = end_explist(i, tokens)
+    elif was_args_back:
+        #i, tokens = args_back(i, tokens)
+        pass
+    return i, tokens
+
+def stat_func_exp(i, tokens):
+    was_exp_back = contains(i-1, tokens, [("]",MATCH_VALUE),("Name",MATCH_TYPE)])
+    
+    was_args_back_bracket = contains(i-1, tokens, [(")",MATCH_VALUE)])
+    was_args_back_parenthesis = contains(i-1, tokens, [("}",MATCH_VALUE)])
+    was_args_back_name = contains(i-1, tokens, [("String",MATCH_TYPE)])
+    was_args_back = was_args_back_bracket and was_args_back_parenthesis and was_args_back_name
+
+    if was_exp_back:
+        #i, tokens = exp_back(i, tokens)
+        i, tokens = end_explist(i, tokens)
+    elif was_args_back:
+        #i, tokens = args_back(i, tokens)
+        pass
+    return i, tokens
+
+def end_explist(i, tokens):
+    print("In end_explist")
+    i, tokens = star(i, tokens, [(",",MATCH_VALUE),(var,MATCH_FUNCTION)], 1)
+    i, tokens = matchValueNow(i, tokens, "=")
+    i, tokens = explist(i, tokens)
+    addFunctionNames(tokens)
+    return i, tokens
+
 def stat(i, tokens):
     global varnames
     global expnames
     global recent_parameter_list
     print("In stat",i)
+    old = '''
     if contains(i, tokens, firstSets["varlist"]) and contains(i+1, tokens, firstSets["exp_args_back"]+firstSets["exp"]+[(",",MATCH_VALUE),("=",MATCH_VALUE)]):
         print("Hi from inside first varlist",i)
         original_i = i
@@ -203,31 +291,20 @@ def stat(i, tokens):
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = explist(i, tokens)
         print("Hi the EXPLIST is ;;;;;;;;;",expnames)
-        for j, (a,b) in enumerate(expnames):
-            if a == -1 and b == -1:
-                recent_parameter_list.insert( j , (-1,-1) )
-        #print("HI the func args are -------",recent_parameter_list)
-        try:
-            n = len(varnames)
-            for j in range(0, n):
-                if expnames[j][0] != -1:
-                    varname = varnames[j]
-                    params = recent_parameter_list[j]
-                    name_str = ""
-                    args_str = ""
-                    for k in range(varname[0], varname[1]):
-                        name_str += tokens[k].value
-                    for k in range(params[0], params[1]):
-                        args_str += tokens[k].value
-                    s = name_str,args_str
-                    function_list.append(s)
-        except IndexError:
-            error("Could not parse the function header")
-        varnames = []
-        expnames = []
-        recent_parameter_list = []
+        addFunctionNames(tokens)
     elif contains(i, tokens, firstSets["functioncall"]) and contains(i+1, tokens, firstSets["exp_args_back"]+firstSets["args_back"]):
         i, tokens = functioncall(i, tokens)
+    '''
+    if contains(i, tokens, [("Name",MATCH_TYPE)]):
+        i, tokens = matchTypeNow(i, tokens, "Name")
+        i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+        i, tokens = stat_name(i, tokens)
+    elif contains(i, tokens, [("(",MATCH_VALUE)]):
+        i, tokens = matchValueNow(i, tokens, "(")
+        i, tokens = exp(i, tokens)
+        i, tokens = matchValueNow(i, tokens, ")")
+        i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+        i, tokens = stat_func_exp(i, tokens)
     elif contains(i, tokens, [("do",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "do")
         i, tokens = matchValueNow(i, tokens, "block")
@@ -340,14 +417,18 @@ def var(i, tokens):
         print("Done exp_front",i)
         i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
         print("Done exp_front",i)
-        i, tokens = exp_back(i, tokens)
+        #i, tokens = exp_back(i, tokens)
         print("Done exp_back that never happens, see i",i)
+        if not contains(i-1, tokens, [("]",MATCH_VALUE),("Name",MATCH_TYPE)]):
+                print("Should have a closing exp_back")
     varnames.append( (original_i,i) ) # note down the variable
     return i, tokens
 
 def functioncall(i, tokens):
     i, tokens = exp_front(i, tokens)
     i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+    if not contains(i-1, tokens, [(")",MATCH_VALUE),("String",MATCH_TYPE),("}",MATCH_VALUE)]):
+            print("Should have a closing args_back")
     #i, tokens = args_back(i, tokens)
     return i, tokens
 
