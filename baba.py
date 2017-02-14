@@ -44,7 +44,6 @@ def tokenize(code):
             line_start = mo.end()
             line_number += 1
         elif kind == "Empty" or kind == "Comment":
-            print("Matched",value,"as comment")
             pass
         elif kind == 'Error':
             raise RuntimeError('%r unexpected on line %d' % (value, line_number))
@@ -66,10 +65,24 @@ firstSets = dict()
 
 errors_switch = 0
 
+varnames = []
+# list of tuples that are to id this case
+# of function names for lambdas
+    #a, b = function(argy1) end, function(argy2) end
+    #[(a_start, a_end), (b_start, b_end)]
+
+expnames = []
+# same as above for expressions
+
+recent_parameter_list = []
+# stack of tuples that are the args
+
 def error(*err):
     global errors_switch
     if errors_switch == 0:
         print(err)
+
+# why predictive parsing, faster
 
 def parse(fname):
 
@@ -176,19 +189,40 @@ def stat_local(i, tokens):
     return i, tokens
 
 def stat(i, tokens):
-    print("We're in stat",i)
-    a = contains(i, tokens, firstSets["varlist"]) 
-    b = contains(i+1, tokens, [("=",MATCH_VALUE)])
-    print("First and second conds",a,b)
-    print(tokens[i],tokens[i+1])
-    if contains(i, tokens, firstSets["varlist"]) and contains(i+1, tokens, [("=",MATCH_VALUE), ("[",MATCH_VALUE)]):
-        print("In stat, going to do varlist",tokens[i],i)
+    global varnames
+    global expnames
+    global recent_parameter_list
+    print("HI we're in stat",i)
+    if contains(i, tokens, firstSets["varlist"]) and contains(i+1, tokens, [("=",MATCH_VALUE), ("[",MATCH_VALUE), (",",MATCH_VALUE)]):
+        #print("Hi from inside first varist",i)
+        original_i = i
         i, tokens = varlist(i, tokens)
-        print("In stat, going to match =",tokens[i],i)
+        #print("Hi the VARNAMES is :::::::::",varnames)
         i, tokens = matchValueNow(i, tokens, "=")
-        print("In stat, going to match explist",tokens[i],i)
         i, tokens = explist(i, tokens)
-        print("In stat, done",tokens[i],i)
+        #print("Hi the EXPLIST is ;;;;;;;;;",expnames)
+        for j, (a,b) in enumerate(expnames):
+            if a == -1 and b == -1:
+                recent_parameter_list.insert( j , (-1,-1) )
+        #print("HI the func args are -------",recent_parameter_list)
+        try:
+            n = len(varnames)
+            for j in range(0, n):
+                if expnames[j][0] != -1:
+                    varname = varnames[j]
+                    params = recent_parameter_list[j]
+                    name_str = ""
+                    args_str = ""
+                    for k in range(varname[0], varname[1]):
+                        name_str += tokens[k].value
+                    for k in range(params[0], params[1]):
+                        args_str += tokens[k].value
+                    print(name_str,args_str)
+        except IndexError:
+            error("Could not parse the function header")
+        varnames = []
+        expnames = []
+        recent_parameter_list = []
     elif contains(i, tokens, firstSets["functioncall"]) and contains(i+1, tokens, firstSets["exp_args_back"]+firstSets["args_back"]):
         i, tokens = functioncall(i, tokens)
     elif contains(i, tokens, [("do",MATCH_VALUE)]):
@@ -219,10 +253,12 @@ def stat(i, tokens):
         i, tokens = matchValueNow(i, tokens, "for")
         i, tokens = stat_for(i, tokens)
         error("End of for:",tokens[i],i)
-        error("Ahhhh")
     elif contains(i, tokens, [("function",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "function")
+        i_b = i
         i, tokens = funcname(i, tokens)
+        varnames.append( (i_b,i) )
+        expnames.append( (0,0) )
         i, tokens = funcbody(i, tokens)
     elif contains(i, tokens, [("local",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "local")
@@ -231,7 +267,12 @@ def stat(i, tokens):
     return i, tokens
 
 def functiondef(i, tokens):
+    original_i = i
     i, tokens = matchValueNow(i, tokens, "function")
+    # to find a = function(b) end
+    if match_v(tokens, original_i-1, "="):
+        # if an equals behind us
+        print("fooe AHA HAHA HAH SO APPEASING\n\n\n\n")
     error("Going from func def to funcbody",i)
     i, tokens = funcbody(i, tokens)
     error("Back from funcbody to func def",i)
@@ -282,17 +323,24 @@ def prefixexp(i, tokens):
     return i, tokens
 
 def varlist(i, tokens):
+    original_i = i
+    print("In a varlist",i)
     i, tokens = var(i, tokens)
+    print("First mandatory var is",original_i,tokens[original_i])
     i, tokens = star(i, tokens, [(",",MATCH_VALUE),(var,MATCH_FUNCTION)], 2)
+    print("End of varlist",i)
     return i, tokens
 
 def var(i, tokens):
+    global varnames
+    original_i = i
     if contains(i, tokens, firstSets["exp_front"]):
         i, tokens = exp_front(i, tokens)
         i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
         i, tokens = exp_back(i, tokens)
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = matchTypeNow(i, tokens, "Name")
+    varnames.append( (original_i,i) ) # note down the variable
     return i, tokens
 
 def functioncall(i, tokens):
@@ -392,7 +440,10 @@ def field(i, tokens):
     return i, tokens
 
 def exp(i, tokens):
+    global expnames
     error("Starting exp",i)
+    isFunc = False
+    original_i = i
     if contains(i, tokens, [("nil",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "nil")
         i, tokens = exp_p(i, tokens)
@@ -412,11 +463,12 @@ def exp(i, tokens):
         i, tokens = matchValueNow(i, tokens, "...")
         i, tokens = exp_p(i, tokens)
     elif contains(i, tokens, firstSets["functiondef"]):
-        error("Going from exp to func def",i)
+        isFunc = True
+        print("Start of func in exp list",i)
         i, tokens = functiondef(i, tokens)
-        error("Back from func def, in exp",i)
+        funcEnd_i = i
+        print("Func defined in exp list",i)
         i, tokens = exp_p(i, tokens)
-        error("Done exp_p in exp",i)
     elif contains(i, tokens, firstSets["prefixexp"]):
         i, tokens = prefixexp(i, tokens)
         i, tokens = exp_p(i, tokens)
@@ -427,6 +479,10 @@ def exp(i, tokens):
         i, tokens = unop(i, tokens)
         i, tokens = exp(i, tokens)
         i, tokens = exp_p(i, tokens)
+    if isFunc:
+        expnames.append( (original_i,funcEnd_i) )
+    else:
+        expnames.append( (-1,-1) )
     error("Returning from exp",i)
     #traceback.print_exc()
     return i, tokens
@@ -438,6 +494,8 @@ def funcname(i, tokens):
     return i, tokens
 
 def parlist(i, tokens):
+    global recent_parameter_list
+    i_b = i
     # chosen the ... only
     if contains(i, tokens, [("...",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "...")
@@ -445,6 +503,8 @@ def parlist(i, tokens):
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 2)
+    recent_parameter_list.append( (i_b,i) )
+    print("Function:",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
     
     return i, tokens
 
@@ -481,13 +541,15 @@ def matchTerminalInList(i, tokens, list):
 def matchTypeNow(i, tokens, type):
     b = matchType(type)(i,tokens)
     if b:
-        print("Matched",i," to ",type)
+        #print("Matched",i," to ",type)
+        pass
     return b
 
 def matchValueNow(i, tokens, value):
     b = matchValue(value)(i,tokens)
     if b:
-        print("Matched",i," to ",value)
+        #print("Matched",i," to ",value)
+        pass
     return b
 
 def matchType(type):
@@ -590,10 +652,10 @@ def star(i, tokens, func_tuples, lookahead):
     return i, tokens
 
 def match_t(tokens,i,type):
-    return i < len(tokens) and tokens[i].type == type
+    return i >= 0 and i < len(tokens) and tokens[i].type == type
 
 def match_v(tokens,i,val):
-    return i < len(tokens) and tokens[i].value == val
+    return i >= 0 and i < len(tokens) and tokens[i].value == val
 
 if __name__ == "__main__":
     parse(sys.argv[1])
