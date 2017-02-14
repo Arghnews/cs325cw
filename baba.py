@@ -188,6 +188,9 @@ def parse(fname):
         for j in range(0, n):
             f_name = ""
             params = ""
+            line = ""
+            line += str(tokens[function_name_list[j][0]].line)
+            # name of function
             if function_name_list[j][0] == ANON and function_name_list[j][1] == ANON:
                 # anon function
                 f_name += ANONYMOUS_FUNCTION
@@ -196,12 +199,13 @@ def parse(fname):
                         function_name_list[j][1]):
                     f_name += tokens[k].value
 
+            # params list string
             params += "("
             for k in range(function_params_list[j][0],
                     function_params_list[j][1]):
                 params += tokens[k].value
             params += ")"
-            print(f_name,params)
+            print("Line:",line,f_name,params)
     #function_name_list = []
     #function_params_list = []
 
@@ -712,7 +716,10 @@ def star(i, tokens, func_tuples, lookahead, lookback=0):
 
 def match_t(tokens,i,type):
     #error("Type:Trying to match",tokens[i].type,"to",type)
-    return i >= 0 and i < len(tokens) and tokens[i].type == type
+    b = i >= 0 and i < len(tokens) and tokens[i].type == type
+    if not b:
+        error("Expected-type",type," but got ",tokens[i].value," of type ",tokens[i].type)
+    return b
 
 def match_v(tokens,i,val):
     #error("Val:Trying to match",tokens[i].value,"to",val)
