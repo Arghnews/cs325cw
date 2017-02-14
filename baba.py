@@ -29,7 +29,8 @@ def tokenize(code):
             ("Name", r'[_a-zA-Z][_a-zA-Z0-9]*'), # should be before keyword
             ("Keyword", keywords_regex),
             ("Operator", operators_regex),
-            ("String", r'\"[^\"]*\"|\'[^\']*\''),
+            #("String", r'/"\"(?:[^"\\]\\.)*"/"|\'[^\']*\''),
+            ("String", r'\"([^\"\\]|\\.)*\"|\'([^\'\\]|\\.)*\''),
             ("Newline", r'\n'),
             ("Empty", r' '),
             ("Error", r'.'), # Must be last
@@ -426,6 +427,7 @@ def exp_front(i, tokens):
     return i, tokens
 
 def exp_back(i, tokens):
+    print("In exp_back",i)
     if contains(i, tokens, [("[",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "[")
         i, tokens = exp(i, tokens)
@@ -433,6 +435,7 @@ def exp_back(i, tokens):
     elif contains(i, tokens, [(".",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, ".")
         i, tokens = matchTypeNow(i, tokens, "Name")
+    print("Out exp_back",i)
     return i, tokens
 
 def args_back(i, tokens):
@@ -485,6 +488,7 @@ def fieldlist(i, tokens):
     return i, tokens
 
 def field(i, tokens):
+    print("In field",i)
     if contains(i, tokens, [("[",MATCH_VALUE)]):
         # todo, fill the aftermath of each of these
         # with checks and should haves
@@ -493,12 +497,17 @@ def field(i, tokens):
         i, tokens = matchValueNow(i, tokens, "]")
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
-    elif contains(i, tokens, [("Name",MATCH_TYPE)]):
+    elif contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i, tokens, [("=",MATCH_VALUE)]):
+        # need lookahead 2 to decide if going to Name and then = or
+        # just exp that can be Name
+        print("In name in field",i)
         i, tokens = matchTypeNow(i, tokens, "Name")
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
+        print("Out name in field",i)
     elif contains(i, tokens, firstSets["exp"]):
         i, tokens = exp(i, tokens)
+    print("Out field",i)
     return i, tokens
 
 def exp(i, tokens):
