@@ -292,7 +292,7 @@ def stat(i, tokens):
         i, tokens = stat_name_eap(i, tokens)
     elif contains(i, tokens, [("do",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "do")
-        i, tokens = matchValueNow(i, tokens, "block")
+        i, tokens = block(i, tokens)
         i, tokens = matchValueNow(i, tokens, "end")
     elif contains(i, tokens, [("while",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "while")
@@ -319,11 +319,13 @@ def stat(i, tokens):
         i, tokens = stat_for(i, tokens)
         error("End of for:",tokens[i],i)
     elif contains(i, tokens, [("function",MATCH_VALUE)]):
+        print("In stat in function",i)
         i, tokens = matchValueNow(i, tokens, "function")
         i_b = i
         i, tokens = funcname(i, tokens)
         log_function_name(i_b, i)
         i, tokens = funcbody(i, tokens)
+        print("Out stat in function",i)
     elif contains(i, tokens, [("local",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "local")
         i, tokens = stat_local(i, tokens)
@@ -476,9 +478,13 @@ def explist(i, tokens):
     return i, tokens
 
 def tableconstructor(i, tokens):
+    print("In tablecons",i)
     i, tokens = matchValueNow(i, tokens, "{")
+    print("Enter optional fieldlist",i)
     i, tokens = optional(i, tokens, [(fieldlist,MATCH_FUNCTION)], 1)
+    print("Out of optional fieldlist",i)
     i, tokens = matchValueNow(i, tokens, "}")
+    print("Out tablecons",i)
     return i, tokens
 
 def fieldlist(i, tokens):
@@ -497,7 +503,7 @@ def field(i, tokens):
         i, tokens = matchValueNow(i, tokens, "]")
         i, tokens = matchValueNow(i, tokens, "=")
         i, tokens = exp(i, tokens)
-    elif contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i, tokens, [("=",MATCH_VALUE)]):
+    elif contains(i, tokens, [("Name",MATCH_TYPE)]) and contains(i+1, tokens, [("=",MATCH_VALUE)]):
         # need lookahead 2 to decide if going to Name and then = or
         # just exp that can be Name
         print("In name in field",i)
@@ -712,7 +718,7 @@ def match_v(tokens,i,val):
     #error("Val:Trying to match",tokens[i].value,"to",val)
     b = i >= 0 and i < len(tokens) and tokens[i].value == val
     if not b:
-        error("Expected",val," but got ",tokens[i].value)
+        error("Expected-value",val," but got ",tokens[i].value)
     return b
 
 if __name__ == "__main__":
