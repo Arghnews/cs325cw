@@ -8,6 +8,13 @@ import traceback
 
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
+# function adapted from https://docs.python.org/3.4/library/re.html#writing-a-tokenizer
+# takes input program as a string and turns it into tokens
+# yields these tokens so they may be processed
+# token have line/column of item, as well as a type
+# and the value of the item, eg. a variable name has
+# value 'foo' and type 'Name
+# a number has type 'Number' and value '69.'
 def tokenize(code):
     keywords = ["and","break","do","else","elseif","end","false",
             "for","function","if","in","local","nil","not","or",
@@ -27,7 +34,6 @@ def tokenize(code):
             ("Name", r'[_a-zA-Z][_a-zA-Z0-9]*'), # should be before keyword
             ("Keyword", keywords_regex),
             ("Operator", operators_regex),
-            #("String", r'/"\"(?:[^"\\]\\.)*"/"|\'[^\']*\''),
             ("String", r'\"([^\"\\]|\\.)*\"|\'([^\'\\]|\\.)*\''),
             ("Newline", r'\n'),
             ("Empty", r' '),
@@ -46,10 +52,10 @@ def tokenize(code):
         elif kind == "Empty" or kind == "Comment":
             pass
         elif kind == 'Error':
-            raise RuntimeError('%r unexpected on line %d' % (value, line_number))
+            raise RuntimeError('%r unexpected on line %d, could not interpret token' % (value, line_number))
         else:
             if kind == "String" and value:
-                value = value[1:-1] # remove first and last chars
+                value = value[1:-1] # remove first and last chars - quote marks
             elif kind == "LongString" and value:
                 # strip [==[ from start of long string
                 num_square_brackets = 0
@@ -67,7 +73,6 @@ def tokenize(code):
 
                 # strip ]==] from end of long string
                 value = value[:len(value)-prefix_suffix]
-
                 kind = "String"
                 pass
             elif kind == "Name" and value in keywords:
@@ -84,27 +89,71 @@ MATCH_FUNCTION = "function_type"
 firstSets = dict()
 
 errors_switch = 0
+# used to turn off error logging when matching terminals
+# but whilst looking ahead, as a non-match there is not an error
+# when 0 errors are not logged, when entering lookahead function
+# switch inced, when leaving switch decremented
 
 ANON = -1
-# anonymous func in tuple list, obv.
-# i can never be -1
+# anonymous func in tuple list position in token list
+# i can never be -1, so then will know it was an anon func
 
-ANONYMOUS_FUNCTION = "Anonymous function"
+ANONYMOUS_FUNCTION = "anonymous function"
 # pretty print for anonymous function
 
 function_name_list = []
 function_params_list = []
 # both of these are tuples that are the things named
+# these are used to put tuples that are token positions in
+# so later the function arguments and names can be used
 
+firstSets["binop"] = [('+',MATCH_VALUE), ('-',MATCH_VALUE), ('*',MATCH_VALUE), ('/',MATCH_VALUE), ('^',MATCH_VALUE), ('%',MATCH_VALUE), ('..',MATCH_VALUE), ('<',MATCH_VALUE), ('<=',MATCH_VALUE), ('>',MATCH_VALUE), ('>=',MATCH_VALUE), ('==',MATCH_VALUE), ('~=',MATCH_VALUE), ('and',MATCH_VALUE), ('or',MATCH_VALUE)]
+firstSets["exp"] = [('nil',MATCH_VALUE),('false',MATCH_VALUE),('true',MATCH_VALUE),('Number', MATCH_TYPE), ('String', MATCH_TYPE), ('...', MATCH_VALUE),('function',MATCH_VALUE),('(',MATCH_VALUE),('{',MATCH_VALUE),('Name',MATCH_TYPE),('-',MATCH_VALUE),('not',MATCH_VALUE),('#',MATCH_VALUE)]
+firstSets["stat_local"] = [('Name',MATCH_TYPE),('function',MATCH_VALUE)]
+firstSets["stat_for"] = [('Name',MATCH_TYPE)]
+firstSets["functiondef"] = [('function',MATCH_VALUE)]
+firstSets["funcbody"] = [('(',MATCH_VALUE)]
+firstSets["laststat"] = [('return',MATCH_VALUE),('break',MATCH_VALUE)]
+firstSets["prefixexp"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
+firstSets["exp_front"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
+firstSets["var"] = [('Name',MATCH_TYPE)] + firstSets["exp_front"]
+firstSets["stat"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)] + [('do',MATCH_VALUE), ('while',MATCH_VALUE), ('repeat',MATCH_VALUE), ('if',MATCH_VALUE), ('for',MATCH_VALUE), ('function',MATCH_VALUE), ('local',MATCH_VALUE)]
+firstSets["chunk"] = firstSets["stat"] + firstSets["laststat"] + [('EOF',MATCH_TYPE)]
+firstSets["block"] = firstSets["chunk"]
+firstSets["args"] = [('(',MATCH_VALUE),('{',MATCH_VALUE),('String',MATCH_TYPE)]
+firstSets["exp_back"] = [('[',MATCH_VALUE),('.',MATCH_VALUE)]
+firstSets["args_back"] = firstSets["args"] + [(':',MATCH_VALUE)]
+firstSets["exp_args_back"] = firstSets["exp_back"] + firstSets["args_back"]
+firstSets["explist"] = firstSets["exp"]
+firstSets["tableconstructor"] = [('{',MATCH_VALUE)]
+firstSets["fieldlist"] = [('[',MATCH_VALUE),('Name',MATCH_TYPE)] + firstSets["exp"]
+firstSets["field"] = [('[',MATCH_VALUE),('Name',MATCH_TYPE)] + firstSets["exp"]
+firstSets["funcname"] = [('Name',MATCH_TYPE)]
+firstSets["namelist"] = [('Name',MATCH_TYPE)]
+firstSets["parlist"] = [('Name',MATCH_TYPE), ('...',MATCH_VALUE)]
+firstSets["fieldsep"] = [(',',MATCH_VALUE), (';',MATCH_VALUE)]
+firstSets["unop"] = [('-',MATCH_VALUE), ('not',MATCH_VALUE), ('#',MATCH_VALUE)]
+firstSets["exp_p"] = firstSets["namelist"] +firstSets["fieldsep"] + firstSets["laststat"] + firstSets["binop"] + [('do',MATCH_VALUE),('then',MATCH_VALUE),(',',MATCH_VALUE),(')',MATCH_VALUE),(']',MATCH_VALUE),(';',MATCH_VALUE),("EOF",MATCH_TYPE),('until',MATCH_VALUE),('end',MATCH_VALUE),('else',MATCH_VALUE),('elseif',MATCH_VALUE),('}',MATCH_VALUE),('function',MATCH_VALUE) ]
+firstSets["end_explist"] = [(",",MATCH_VALUE),("=",MATCH_VALUE)]
+firstSets["stat_name_eap"] = firstSets["exp_back"] + firstSets["args_back"]
+firstSets["stat_name"] = firstSets["stat_name_eap"] + firstSets["end_explist"]
+
+# appends start and end index of function name to function_name_list
+# ie. (ANON,ANON) -> anon function
+# (5,6) -> function bla where bla at 5
+# (5 8) -> function bla.blabla
 def log_function_name(start_i, end_i):
     global function_name_list
     function_name_list.append( (start_i, end_i) )
 
+# same as above but for logging function parameters
 def log_params(start_i, end_i):
     print("Logging params",start_i,end_i)
     global function_params_list
     function_params_list.append( (start_i, end_i) )
 
+# function to take error and print it
+# only if errors switch is 0
 def error(i_tup,tokens,*err):
     global errors_switch
     if errors_switch == 0:
@@ -118,37 +167,6 @@ def error(i_tup,tokens,*err):
 # why predictive parsing, faster
 
 def parse(fname):
-
-    firstSets["binop"] = [('+',MATCH_VALUE), ('-',MATCH_VALUE), ('*',MATCH_VALUE), ('/',MATCH_VALUE), ('^',MATCH_VALUE), ('%',MATCH_VALUE), ('..',MATCH_VALUE), ('<',MATCH_VALUE), ('<=',MATCH_VALUE), ('>',MATCH_VALUE), ('>=',MATCH_VALUE), ('==',MATCH_VALUE), ('~=',MATCH_VALUE), ('and',MATCH_VALUE), ('or',MATCH_VALUE)]
-    firstSets["exp"] = [('nil',MATCH_VALUE),('false',MATCH_VALUE),('true',MATCH_VALUE),('Number', MATCH_TYPE), ('String', MATCH_TYPE), ('...', MATCH_VALUE),('function',MATCH_VALUE),('(',MATCH_VALUE),('{',MATCH_VALUE),('Name',MATCH_TYPE),('-',MATCH_VALUE),('not',MATCH_VALUE),('#',MATCH_VALUE)]
-    firstSets["stat_local"] = [('Name',MATCH_TYPE),('function',MATCH_VALUE)]
-    firstSets["stat_for"] = [('Name',MATCH_TYPE)]
-    firstSets["functiondef"] = [('function',MATCH_VALUE)]
-    firstSets["funcbody"] = [('(',MATCH_VALUE)]
-    firstSets["laststat"] = [('return',MATCH_VALUE),('break',MATCH_VALUE)]
-    firstSets["prefixexp"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
-    firstSets["exp_front"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)]
-    firstSets["var"] = [('Name',MATCH_TYPE)] + firstSets["exp_front"]
-    firstSets["stat"] = [('Name',MATCH_TYPE),('(',MATCH_VALUE)] + [('do',MATCH_VALUE), ('while',MATCH_VALUE), ('repeat',MATCH_VALUE), ('if',MATCH_VALUE), ('for',MATCH_VALUE), ('function',MATCH_VALUE), ('local',MATCH_VALUE)]
-    firstSets["chunk"] = firstSets["stat"] + firstSets["laststat"] + [('EOF',MATCH_TYPE)]
-    firstSets["block"] = firstSets["chunk"]
-    firstSets["args"] = [('(',MATCH_VALUE),('{',MATCH_VALUE),('String',MATCH_TYPE)]
-    firstSets["exp_back"] = [('[',MATCH_VALUE),('.',MATCH_VALUE)]
-    firstSets["args_back"] = firstSets["args"] + [(':',MATCH_VALUE)]
-    firstSets["exp_args_back"] = firstSets["exp_back"] + firstSets["args_back"]
-    firstSets["explist"] = firstSets["exp"]
-    firstSets["tableconstructor"] = [('{',MATCH_VALUE)]
-    firstSets["fieldlist"] = [('[',MATCH_VALUE),('Name',MATCH_TYPE)] + firstSets["exp"]
-    firstSets["field"] = [('[',MATCH_VALUE),('Name',MATCH_TYPE)] + firstSets["exp"]
-    firstSets["funcname"] = [('Name',MATCH_TYPE)]
-    firstSets["namelist"] = [('Name',MATCH_TYPE)]
-    firstSets["parlist"] = [('Name',MATCH_TYPE), ('...',MATCH_VALUE)]
-    firstSets["fieldsep"] = [(',',MATCH_VALUE), (';',MATCH_VALUE)]
-    firstSets["unop"] = [('-',MATCH_VALUE), ('not',MATCH_VALUE), ('#',MATCH_VALUE)]
-    firstSets["exp_p"] = firstSets["namelist"] +firstSets["fieldsep"] + firstSets["laststat"] + firstSets["binop"] + [('do',MATCH_VALUE),('then',MATCH_VALUE),(',',MATCH_VALUE),(')',MATCH_VALUE),(']',MATCH_VALUE),(';',MATCH_VALUE),("EOF",MATCH_TYPE),('until',MATCH_VALUE),('end',MATCH_VALUE),('else',MATCH_VALUE),('elseif',MATCH_VALUE),('}',MATCH_VALUE),('function',MATCH_VALUE) ]
-    firstSets["end_explist"] = [(",",MATCH_VALUE),("=",MATCH_VALUE)]
-    firstSets["stat_name_eap"] = firstSets["exp_back"] + firstSets["args_back"]
-    firstSets["stat_name"] = firstSets["stat_name_eap"] + firstSets["end_explist"]
     # follow(exp) = firstSets["exp_p"] - firstSets["binop"]
 
     ## add followset of stat to exp_p
@@ -158,7 +176,6 @@ def parse(fname):
     ## add followset of stat_local to exp_p
     ## add followset of laststat to exp_p
 
-    # ^([0-9]*)(\.[0-9]+)?([eE]-?[0-9]+)?$|^([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?$|^0x([0-9a-fA-F]*)(\.[0-9a-fA-F]+)?([pP]-?[0-9]+)?$|^0x([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?$
     program = ""
     with open(fname, "r") as ins:
         for line in ins:
@@ -194,7 +211,7 @@ def parse(fname):
             line = ""
             line += str(tokens[function_name_list[j][0]].line)
             # name of function
-            if function_name_list[j][0] == ANON and function_name_list[j][1] == ANON:
+            if function_name_list[j][0] == ANON or function_name_list[j][1] == ANON:
                 # anon function
                 f_name += ANONYMOUS_FUNCTION
             else:
@@ -344,9 +361,10 @@ def stat(i, tokens):
     return i, tokens
 
 def functiondef(i, tokens):
+    i_b = i
     print("In func def")
     i, tokens = matchValueNow(i, tokens, "function")
-    log_function_name(ANON, ANON)
+    log_function_name(i_b, ANON)
     i, tokens = funcbody(i, tokens)
     print("Out func def")
     return i, tokens
