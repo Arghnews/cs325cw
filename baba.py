@@ -9,8 +9,6 @@ import traceback
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
 def tokenize(code):
-    code = code.replace("\t"," ")
-    code = code.replace("  "," ")
     keywords = ["and","break","do","else","elseif","end","false",
             "for","function","if","in","local","nil","not","or",
             "repeat","return","then","true","until","while"]
@@ -107,13 +105,15 @@ def log_params(start_i, end_i):
     global function_params_list
     function_params_list.append( (start_i, end_i) )
 
-def error(*err):
+def error(i_tup,tokens,*err):
     global errors_switch
     if errors_switch == 0:
         s = ""
+        err_line = tokens[i_tup[0]].line
+        err_col = tokens[i_tup[0]].column
         for item in err:
             s += item
-        print("Error:",s)
+        print("Error:",s,"on line",err_line,"at col",err_col)
 
 # why predictive parsing, faster
 
@@ -242,6 +242,7 @@ def stat_for(i, tokens):
     return i, tokens
 
 def stat_local(i, tokens):
+    print("In stat local",i)
     if contains(i, tokens, [("function",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "function")
         i_b = i
@@ -251,6 +252,8 @@ def stat_local(i, tokens):
     elif contains(i, tokens, firstSets["namelist"]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens,[("=",MATCH_VALUE),(explist,MATCH_FUNCTION)], 1)
+    else:
+        error((i,i), tokens, "Expected function declaration or variable name")
     return i, tokens
 
 def stat_name(i, tokens):
@@ -321,10 +324,8 @@ def stat(i, tokens):
         i, tokens = optional(i, tokens, [("else",MATCH_VALUE),(block,MATCH_FUNCTION)], 1)
         i, tokens = matchValueNow(i, tokens, "end")
     elif contains(i, tokens, [("for",MATCH_VALUE)]):
-        error("Start of for:",tokens[i],i)
         i, tokens = matchValueNow(i, tokens, "for")
         i, tokens = stat_for(i, tokens)
-        error("End of for:",tokens[i],i)
     elif contains(i, tokens, [("function",MATCH_VALUE)]):
         print("In stat in function",i)
         i, tokens = matchValueNow(i, tokens, "function")
@@ -385,7 +386,7 @@ def laststat(i, tokens):
     return i, tokens
 
 def prefixexp(i, tokens):
-    print(";;;;;;;;;;;;;;;;;; Entered prefixexp",i)
+    print("Entered prefixexp",i)
     if contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = matchTypeNow(i, tokens, "Name")
         i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
@@ -721,14 +722,14 @@ def match_t(tokens,i,type):
     #error("Type:Trying to match",tokens[i].type,"to",type)
     b = i >= 0 and i < len(tokens) and tokens[i].type == type
     if not b:
-        error("Expected-type '",type,"' but got '",tokens[i].value,"' of type '",tokens[i].type,"'")
+        error((i,i),tokens,"Expected-type '",type,"' but got '",tokens[i].value,"' of type '",tokens[i].type,"'")
     return b
 
 def match_v(tokens,i,val):
     #error("Val:Trying to match",tokens[i].value,"to",val)
     b = i >= 0 and i < len(tokens) and tokens[i].value == val
     if not b:
-        error("Expected-value '",val,"' but got '",tokens[i].value,"'")
+        error((i,i),tokens,"Expected-value '",val,"' but got '",tokens[i].value,"'")
     return b
 
 if __name__ == "__main__":
