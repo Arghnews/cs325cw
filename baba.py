@@ -102,6 +102,7 @@ def log_function_name(start_i, end_i):
     function_name_list.append( (start_i, end_i) )
 
 def log_params(start_i, end_i):
+    print("Logging params",start_i,end_i)
     global function_params_list
     function_params_list.append( (start_i, end_i) )
 
@@ -178,6 +179,7 @@ def parse(fname):
     if len(function_name_list) != len(function_params_list):
         # we're screwed, errors so function declares and
         # func params don't line up, so we don't know
+        print("Length of functions name list does not match that of params list")
         pass
     else:
         print("Printing functions")
@@ -331,14 +333,18 @@ def stat(i, tokens):
     return i, tokens
 
 def functiondef(i, tokens):
+    print("In func def")
     i, tokens = matchValueNow(i, tokens, "function")
     log_function_name(ANON, ANON)
     i, tokens = funcbody(i, tokens)
+    print("Out func def")
     return i, tokens
 
 def funcbody(i, tokens):
     i, tokens = matchValueNow(i, tokens, "(")
+    i_b = i
     i, tokens = optional(i, tokens, [(parlist,MATCH_FUNCTION)], 1)
+    log_params(i_b, i)
     i, tokens = matchValueNow(i, tokens, ")")
     i, tokens = block(i, tokens)
     i, tokens = matchValueNow(i, tokens, "end")
@@ -544,7 +550,6 @@ def parlist(i, tokens):
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 1)
-    log_params(i_b, i)
     return i, tokens
 
 def namelist(i, tokens):
