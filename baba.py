@@ -24,6 +24,7 @@ def tokenize(code):
     token_specification = [
             # Order in the Number matters, hex first
             ("Comment", r'--.*\n'), # only works on single line comment
+            ("LongString", r'\[(?P<longString>=*)\[(.|\n)*?\](?P=longString)\]'),
             ("Number", r'0[xX]([0-9a-fA-F]*)(\.[0-9a-fA-F]+)([pP]-?[0-9]+)?|0[xX]([0-9a-fA-F]+)(\.[0-9a-fA-F]*)?([pP]-?[0-9]+)?|([0-9]+)(\.[0-9]*)?([eE]-?[0-9]+)?|([0-9]*)(\.[0-9]+)([eE]-?[0-9]+)?' ),
             ("Name", r'[_a-zA-Z][_a-zA-Z0-9]*'), # should be before keyword
             ("Keyword", keywords_regex),
@@ -50,6 +51,26 @@ def tokenize(code):
         else:
             if kind == "String" and value:
                 value = value[1:-1] # remove first and last chars
+            elif kind == "LongString" and value:
+                # strip [==[ from start of long string
+                num_square_brackets = 0
+                prefix_suffix = 0
+                for v in value:
+                    prefix_suffix += 1
+                    if v == "[":
+                        num_square_brackets += 1
+                    if num_square_brackets == 2:
+                        value = value[prefix_suffix:]
+                        # strip newline if first char
+                        if value[0] == '\n':
+                            value = value[1:]
+                        break
+
+                # strip ]==] from end of long string
+                value = value[:len(value)-prefix_suffix]
+
+                kind = "String"
+                pass
             elif kind == "Name" and value in keywords:
                 kind = "Keyword" # to convert keywords picked up as names to keywords
             column = mo.start() - line_start

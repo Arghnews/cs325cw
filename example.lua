@@ -13,7 +13,7 @@ end
 --
 --  The training loop and learning rate schedule
 --
-
+local a =
 [====[
 hi world
 ]====]
