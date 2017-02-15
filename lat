@@ -1,0 +1,8 @@
+#!/bin/bash
+
+targ=$1
+if [ ! -z ${targ+x} ]; then
+	targ='report'
+fi
+#pdflatex $targ && bibtex $targ && pdflatex $targ && pdflatex $targ && okular $targ.pdf &
+pdflatex $targ && bibtex $targ && pdflatex $targ && pdflatex $targ && echo "Success"

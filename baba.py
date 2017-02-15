@@ -6,9 +6,17 @@ import copy
 import sys
 import traceback
 
+# file layout
+# - declaration of global data structures/constants
+# - tokenizer
+# - main parse function
+# - error/function logging functions
+# - functions that map to the nonterminals in the grammar
+# - functions that match, return curried functions etc.
+# to implement operations like lookahead/star
+# - grammar
 
-
-# declaration of global data structures
+# Much of program structure and ideas were discussed in collaboration with student (csunao)
 
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
@@ -325,8 +333,13 @@ def error_list_string(tokens):
         this_err = ""
         items = ""
 
-        err_line = str(tokens[err_start_token_index].line)
-        err_col = str(tokens[err_start_token_index].column)
+        err_line = ""
+        err_col = ""
+        try:
+            err_line += str(tokens[err_start_token_index].line)
+            err_col += str(tokens[err_start_token_index].column)
+        except IndexError:
+            pass
 
         for item in err_print_list:
             items += item
@@ -404,6 +417,7 @@ def stat_name(i, tokens):
         print("Done with stat_name_explist",i)
     else:
         error_expected((i,i),tokens,firstSets["stat_name"])
+    print("Leaving the real world of stat_name",i)
     return i, tokens
 
 def stat_name_eap(i, tokens):
@@ -588,6 +602,7 @@ def exp_front(i, tokens):
         i, tokens = matchValueNow(i, tokens, ")")
     else:
         error_expected((i,i),tokens,firstSets["exp_front"])
+        i += 1
     return i, tokens
 
 def exp_back(i, tokens):
@@ -720,6 +735,7 @@ def exp(i, tokens):
         i, tokens = exp_p(i, tokens)
     else:
         error_expected((i,i),tokens,firstSets["exp"])
+        i += 1
     return i, tokens
 
 def funcname(i, tokens):
@@ -1002,3 +1018,84 @@ def match_v(tokens,i,val):
 
 if __name__ == "__main__":
     parse(sys.argv[1])
+
+
+# the grammar
+grammar='''
+chunk ::= { stat [ `;´ ] } [ laststat [ `;´ ] ]
+
+exp ::=  nil exp_p | false exp_p | true exp_p | Number exp_p | String exp_p | `...´ exp_p | functiondef exp_p | 
+     prefixexp exp_p | tableconstructor exp_p  | unop exp exp_p 
+
+# is this same as [ binop exp exp_p ]
+exp_p ::= [ binop exp exp_p ]
+
+stat ::= 
+     Name { exp_args_back } stat_name |
+     `(´ exp `)´ { exp_args_back } stat_name_eap |
+
+     do block end | 
+     while exp do block end | 
+     repeat block until exp | 
+     if exp then block { elseif exp then block } [ else block ] end | 
+     for stat_for |
+     function funcname funcbody |
+     local stat_local
+##
+
+stat_name ::= stat_name_eap | end_explist
+
+stat_name_eap ::= exp_back end_explist |
+                  args_back
+##
+
+end_explist ::= { `,´ var } `=´ explist
+
+prefixexp ::= Name { exp_args_back } | `(´ exp `)´ { exp_args_back }
+
+var ::= exp_front { exp_args_back } exp_back | Name
+
+exp_args_back ::= exp_back | args_back
+
+exp_front ::= Name | `(´ exp `)´
+
+exp_back ::= `[´ exp `]´ | `.´ Name
+
+args_back ::= args | `:´ Name args
+
+args ::= `(´ [ explist ] `)´ | tableconstructor | String 
+
+block ::= chunk
+
+stat_local ::= function Name funcbody | namelist [ `=´ explist ]
+
+stat_for ::= Name `=´ exp `,´ exp [ `,´ exp ] do block end | namelist in explist do block end
+
+functiondef ::= function funcbody
+
+funcbody ::= `(´ [ parlist ] `)´ block end
+
+laststat ::= return [ explist ] | break
+
+explist ::=  exp { `,´ exp }
+
+tableconstructor ::= `{´ [ fieldlist ] `}´
+
+fieldlist ::= field { fieldsep field } [ fieldsep ]
+
+field ::= `[´ exp `]´ `=´ exp | Name `=´ exp | exp
+
+funcname ::= Name { `.´ Name } [ `:´ Name ]
+
+namelist ::= Name { `,´ Name }
+
+parlist ::= namelist [ `,´ `...´ ] | `...´
+
+fieldsep ::= `,´ | `;´
+
+binop ::= `+´ | `-´ | `*´ | `/´ | `^´ | `%´ | `..´ | 
+     `<´ | `<=´ | `>´ | `>=´ | `==´ | `~=´ | 
+     and | or
+
+unop ::= `-´ | not | `#´
+'''
