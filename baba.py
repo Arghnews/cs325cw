@@ -97,6 +97,7 @@ firstSets["stat_name"] = firstSets["stat_name_eap"] + firstSets["end_explist"]
 # value 'foo' and type 'Name
 # a number has type 'Number' and value '69.'
 def tokenize(code):
+    code = code.replace("\t","    ")
     keywords = ["and","break","do","else","elseif","end","false",
             "for","function","if","in","local","nil","not","or",
             "repeat","return","then","true","until","while"]
@@ -260,6 +261,7 @@ def error(i_tup,tokens,*err):
     global error_list
     global errors_switch
     if errors_switch == 0:
+        print("Logging error, i is",i_tup[0])
         err_str_list = []
         for err_print in err:
             err_str_list.append(err_print)
@@ -276,8 +278,8 @@ def error_expected(i_tup,tokens,firstSets,*err):
     for (value,type) in firstSets:
         # change name to nicer case of variable name
         val = value
-        if type == MATCH_TYPE and value == "Name":
-            val = "Variable name"
+        if value == "Name" and type == MATCH_TYPE:
+            val = "variable name"
         expected_values.append(val)
 
     expected_values_uniq = unique(expected_values)
@@ -373,6 +375,8 @@ def stat_for(i, tokens):
         i, tokens = matchValueNow(i, tokens, "do")
         i, tokens = block(i, tokens)
         i, tokens = matchValueNow(i, tokens, "end")
+    else:
+        error_expected((i,i),tokens,firstSets["stat_for"])
     return i, tokens
 
 def stat_local(i, tokens):
@@ -387,7 +391,7 @@ def stat_local(i, tokens):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens,[("=",MATCH_VALUE),(explist,MATCH_FUNCTION)], 1)
     else:
-        error((i,i), tokens, "Expected function declaration or variable name")
+        error_expected((i,i),tokens,firstSets["stat_local"])
     return i, tokens
 
 def stat_name(i, tokens):
@@ -399,9 +403,7 @@ def stat_name(i, tokens):
         i, tokens = end_explist(i, tokens)
         print("Done with stat_name_explist",i)
     else:
-        #error((i,i),tokens,"Expected name/longer name or '= expression' but got ",tokens[i].value)
-        error_expected((i,i),tokens,firstSets["stat_name_eap"]+firstSets["end_explist"])
-        i += 1
+        error_expected((i,i),tokens,firstSets["stat_name"])
     return i, tokens
 
 def stat_name_eap(i, tokens):
@@ -410,6 +412,8 @@ def stat_name_eap(i, tokens):
         i, tokens = end_explist(i, tokens)
     elif contains(i, tokens, firstSets["args_back"]):
         i, tokens = args_back(i, tokens)
+    else:
+        error_expected((i,i),tokens,firstSets["stat_name_eap"])
     return i, tokens
 
 def end_explist(i, tokens):
@@ -425,7 +429,7 @@ def end_explist(i, tokens):
 def stat(i, tokens):
     print("In stat",i)
     if contains(i, tokens, [("Name",MATCH_TYPE)]):
-        print("In name in stat",i)
+        print("\tIn name in stat",i)
         i, tokens = matchTypeNow(i, tokens, "Name")
         print("\tMatched name in stat",i)
         i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1, 1)
@@ -476,6 +480,7 @@ def stat(i, tokens):
         i, tokens = matchValueNow(i, tokens, "local")
         i, tokens = stat_local(i, tokens)
     else:
+        error_expected((i,i),tokens,firstSets["stat"])
         #error("Error in statement",tokens[i])
         pass
     
@@ -521,7 +526,8 @@ def laststat(i, tokens):
         i, tokens = optional(i, tokens, [(explist,MATCH_FUNCTION)], 1)
     elif contains(i, tokens, [("break",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "break")
-
+    else:
+        error_expected((i,i),tokens,firstSets["laststat"])
     return i, tokens
 
 def prefixexp(i, tokens):
@@ -536,6 +542,8 @@ def prefixexp(i, tokens):
         i, tokens = exp(i, tokens)
         i, tokens = matchValueNow(i, tokens, ")")
         i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1)
+    else:
+        error_expected((i,i),tokens,firstSets["prefixexp"])
     return i, tokens
 
 def var(i, tokens):
@@ -552,6 +560,9 @@ def var(i, tokens):
         print("Done exp_front",i)
         i, tokens = exp_back(i, tokens)
         print("Done exp_back that never happens, see i",i)
+    else:
+        error_expected((i,i),tokens,firstSets["var"])
+        i += 1
     return i, tokens
 
 def exp_args_back(i, tokens):
@@ -563,6 +574,8 @@ def exp_args_back(i, tokens):
         print("Going from exp_args_back into args_back",i)
         i, tokens = args_back(i, tokens)
         print("DOne with args_back in exp_args_back",i)
+    else:
+        error_expected((i,i),tokens,firstSets["exp_args_back"])
     print("Exiting exp_args_back",i)
     return i, tokens
 
@@ -573,6 +586,8 @@ def exp_front(i, tokens):
         i, tokens = matchValueNow(i, tokens, "(")
         i, tokens = exp(i, tokens)
         i, tokens = matchValueNow(i, tokens, ")")
+    else:
+        error_expected((i,i),tokens,firstSets["exp_front"])
     return i, tokens
 
 def exp_back(i, tokens):
@@ -584,6 +599,8 @@ def exp_back(i, tokens):
     elif contains(i, tokens, [(".",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, ".")
         i, tokens = matchTypeNow(i, tokens, "Name")
+    else:
+        error_expected((i,i),tokens,firstSets["exp_back"])
     print("Out exp_back",i)
     return i, tokens
 
@@ -596,6 +613,8 @@ def args_back(i, tokens):
         i, tokens = matchValueNow(i, tokens, ":")
         i, tokens = matchTypeNow(i, tokens, "Name")
         i, tokens = args(i, tokens)
+    else:
+        error_expected((i,i),tokens,firstSets["args_back"])
     print("Leaving args_back",i)
     return i, tokens
 
@@ -612,6 +631,8 @@ def args(i, tokens):
         i, tokens = tableconstructor(i, tokens)
     elif contains(i, tokens, [("String",MATCH_TYPE)]):
         i, tokens = matchTypeNow(i, tokens, "String")
+    else:
+        error_expected((i,i),tokens,firstSets["args"])
     print("Out args",i)
     return i, tokens
 
@@ -660,6 +681,8 @@ def field(i, tokens):
         print("Out name in field",i)
     elif contains(i, tokens, firstSets["exp"]):
         i, tokens = exp(i, tokens)
+    else:
+        error_expected((i,i),tokens,firstSets["field"])
     print("Out field",i)
     return i, tokens
 
@@ -695,6 +718,8 @@ def exp(i, tokens):
         i, tokens = unop(i, tokens)
         i, tokens = exp(i, tokens)
         i, tokens = exp_p(i, tokens)
+    else:
+        error_expected((i,i),tokens,firstSets["exp"])
     return i, tokens
 
 def funcname(i, tokens):
@@ -711,6 +736,8 @@ def parlist(i, tokens):
     elif contains(i, tokens, [("Name",MATCH_TYPE)]):
         i, tokens = namelist(i, tokens)
         i, tokens = optional(i, tokens, [(",",MATCH_VALUE),("...",MATCH_VALUE)], 1)
+    else:
+        error_expected((i,i),tokens,firstSets["parlist"])
     return i, tokens
 
 def namelist(i, tokens):
@@ -719,7 +746,8 @@ def namelist(i, tokens):
     return i, tokens
 
 def binop(i, tokens):
-    return matchTerminalInList(i, tokens, firstSets["binop"])
+    i, tokens = matchTerminalInList(i, tokens, firstSets["binop"])
+    return i, tokens
 
 def unop(i, tokens):
     return matchTerminalInList(i, tokens, firstSets["unop"])
@@ -738,32 +766,52 @@ def fieldsep(i, tokens):
 # helper function to be able to match a terminal in a list of terminals
 # and if a match succeeded increment i based on the result
 def matchTerminalInList(i, tokens, list):
+    global errors_switch
+    errors_switch += 1 # disable errors
+    success = False
     if contains(i, tokens, list):
         for op in list:
             b = match_v(tokens, i, op[0])
             if b:
                 successOp = op[0]
+                success = True
                 break
-    i_b = i
-    i, tokens = matchValueNow(i, tokens, successOp)
-    success = i != i_b
+    errors_switch -= 1 # enable errors
     if not success:
-        # syntax error, expected x but got y
-        # consume token anyway
-        i += 1
+        successOp = ""
+    i, tokens = matchValueNow(i, tokens, successOp)
     return i, tokens
 
 # helper function that immediately calls curried match type function
 # that was returned by matchType, to avoid matchType(type)(i, tokens)
 def matchTypeNow(i, tokens, type):
-    b = matchType(type)(i,tokens)
-    return b
+    global errors_switch # unnecessary
+    i_b = i
+    i, tokens = matchType(type)(i,tokens)
+    success = i_b != i
+    # in the case where i has not been incremented ie. token
+    # not consumed, had a mismatch
+    # shall log the error and increment i anyway
+    if errors_switch == 0 and not success:
+        print("Matching ", type,"not matched- Incing i anyway")
+        i += 1
+        pass
+    return i, tokens
 
 # helper function that immediately calls curried match value function
 # that was returned by matchValue, to avoid matchType(value)(i, tokens)
 def matchValueNow(i, tokens, value):
-    b = matchValue(value)(i,tokens)
-    return b
+    i_b = i
+    i, tokens = matchValue(value)(i,tokens)
+    success = i_b != i
+    # in the case where i has not been incremented ie. token
+    # not consumed, had a mismatch
+    # shall log the error and increment i anyway
+    if errors_switch == 0 and not success:
+        print("Matching ", value,"not matched- Incing i anyway")
+        i += 1
+        pass
+    return i, tokens
 
 # returns a curried function that matches the type passed in
 # and increments i if the match was a success
