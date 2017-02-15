@@ -195,13 +195,26 @@ def parse(fname):
     i, tokens = doIt(i, tokens)
     print("Output:",[str(t.type)+": "+str(t.value) for t in tokens[i_b:i]])
 
+    # if any errors
+    if len(error_list) > 0:
+        f = error_list_string
+    else:
+        f = functions_string
+    print(f(tokens))
+
+
+
+# converts the tuples of function positions/args positions in the
+# function_name_list and function_params_list to a nice string
+def functions_string(tokens):
+    ret = ""
     if len(function_name_list) != len(function_params_list):
         # we're screwed, errors so function declares and
         # func params don't line up, so we don't know
-        print("Length of functions name list does not match that of params list")
+        print("Length of functions name list does not match that of functions params list, cannot print functions list")
         pass
     else:
-        print("Printing functions")
+        ret += "Printing functions\n"
         n = len(function_name_list)
         for j in range(0, n):
             f_name = ""
@@ -223,13 +236,9 @@ def parse(fname):
                     function_params_list[j][1]):
                 params += tokens[k].value
             params += ")"
-            print("Line:",line,f_name,params)
+            ret += "Line " + line + ": " + f_name + " " + params + '\n'
 
-        parse_error_list(tokens)
-
-
-
-
+    return ret
 
 # appends start and end index of function name to function_name_list
 # ie. (i,ANON) -> anon function
@@ -256,9 +265,55 @@ def error(i_tup,tokens,*err):
             err_str_list.append(err_print)
         error_list.append( (i_tup,err_str_list) )
 
+# wrapper for 'error' function in the case where entered a grammar function
+# but could not find any matches, is passed lists that are first sets
+# and prints adds the unique elements of these to the err printout
+# to say expected item from that set
+def error_expected(i_tup,tokens,firstSets,*err):
+    err_print = ""
+    expected_values = []
+    # add "=", ";", "Name" etc
+    for (value,type) in firstSets:
+        # change name to nicer case of variable name
+        val = value
+        if type == MATCH_TYPE and value == "Name":
+            val = "Variable name"
+        expected_values.append(val)
+
+    expected_values_uniq = unique(expected_values)
+
+    err_print += "Expected one of "
+    err_print_expected_items = ""
+    for v in expected_values_uniq:
+        err_print_expected_items += "`" + v + '´' + ", "
+    # strip trailing comma and space
+    if err_print_expected_items:
+        err_print_expected_items = err_print_expected_items[:-2]
+    err_print += err_print_expected_items
+    
+    # add the variable to err printout,
+    # even if it's like a.b[3]
+    received_var = ""
+    start_tok = i_tup[0]
+    end_tok = i_tup[1]
+    if start_tok == end_tok:
+        end_tok += 1
+    for j in range(start_tok, end_tok):
+        received_var += tokens[j].value
+    err_print += " but got `" + received_var + '´'
+
+    error(i_tup,tokens,err_print,*err)
+
+# unique elements from a list, optim is func in local var
+# http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-whilst-preserving-order
+def unique(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
+
 # turns the error list into a string
 # that can be printed
-def parse_error_list(tokens):
+def error_list_string(tokens):
     errString = ""
     for j in range(0, len(error_list)):
         err_start_token_index = error_list[j][0][0]
@@ -276,9 +331,8 @@ def parse_error_list(tokens):
         this_err = "Error (line " + err_line + ",col "+err_col+") " + items
         errString += this_err + "\n"
 
-    print(errString)
+    return errString
     
-
 
 
 
@@ -345,7 +399,9 @@ def stat_name(i, tokens):
         i, tokens = end_explist(i, tokens)
         print("Done with stat_name_explist",i)
     else:
-        error((i,i),tokens,"Expected name/longer name or '= expression'")
+        #error((i,i),tokens,"Expected name/longer name or '= expression' but got ",tokens[i].value)
+        error_expected((i,i),tokens,firstSets["stat_name_eap"]+firstSets["end_explist"])
+        i += 1
     return i, tokens
 
 def stat_name_eap(i, tokens):
@@ -872,7 +928,12 @@ def match_t(tokens,i,type):
     #error("Type:Trying to match",tokens[i].type,"to",type)
     b = i >= 0 and i < len(tokens) and tokens[i].type == type
     if not b:
-        error((i,i),tokens,"Expected-type '",type,"' but got '",tokens[i].value,"' of type '",tokens[i].type,"'")
+        j = i
+        if j >= len(tokens):
+            j -= 1
+            error((j,j),tokens,"Unexpected end of file")
+        else:
+            error((j,j),tokens,"Expected-type '",type,"' but got '",tokens[j].value,"' of type '",tokens[j].type,"'")
     return b
 
 # simple function to match the current token to a value
@@ -881,7 +942,14 @@ def match_v(tokens,i,val):
     #error("Val:Trying to match",tokens[i].value,"to",val)
     b = i >= 0 and i < len(tokens) and tokens[i].value == val
     if not b:
-        error((i,i),tokens,"Expected-value '",val,"' but got '",tokens[i].value,"'")
+        j = i
+        # if at EOF
+        if j >= len(tokens):
+            j -= 1
+            error((j,j),tokens,"Unexpected end of file")
+            #error((j,j),tokens,"Expected-value '",val,"' but got '",tokens[j].value,"'")
+        else:
+            error((j,j),tokens,"Expected-value '",val,"' but got '",tokens[j].value,"'")
     return b
 
 if __name__ == "__main__":
