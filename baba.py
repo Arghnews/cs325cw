@@ -40,6 +40,9 @@ function_params_list = []
 # these are used to put tuples that are token positions in
 # so later the function arguments and names can be used
 
+error_list = []
+# list of errors to print out later
+
 # these are the first sets of all the nonterminals in the program
 # these are used when there is a decision, ie. a '|'
 # in the grammar to choose
@@ -222,6 +225,8 @@ def parse(fname):
             params += ")"
             print("Line:",line,f_name,params)
 
+        parse_error_list(tokens)
+
 
 
 
@@ -243,15 +248,36 @@ def log_params(start_i, end_i):
 # function to take error and print it
 # only if errors switch is 0
 def error(i_tup,tokens,*err):
+    global error_list
     global errors_switch
     if errors_switch == 0:
-        s = ""
-        err_line = tokens[i_tup[0]].line
-        err_col = tokens[i_tup[0]].column
-        for item in err:
-            s += item
-        print("Error:",s,"on line",err_line,"at col",err_col)
+        err_str_list = []
+        for err_print in err:
+            err_str_list.append(err_print)
+        error_list.append( (i_tup,err_str_list) )
 
+# turns the error list into a string
+# that can be printed
+def parse_error_list(tokens):
+    errString = ""
+    for j in range(0, len(error_list)):
+        err_start_token_index = error_list[j][0][0]
+        err_end_token_index = error_list[j][0][1]
+        err_print_list = error_list[j][1]
+
+        this_err = ""
+        items = ""
+
+        err_line = str(tokens[err_start_token_index].line)
+        err_col = str(tokens[err_start_token_index].column)
+
+        for item in err_print_list:
+            items += item
+        this_err = "Error (line " + err_line + ",col "+err_col+") " + items
+        errString += this_err + "\n"
+
+    print(errString)
+    
 
 
 
@@ -318,6 +344,8 @@ def stat_name(i, tokens):
         print("In stat name, should be going to end_explist",i)
         i, tokens = end_explist(i, tokens)
         print("Done with stat_name_explist",i)
+    else:
+        error((i,i),tokens,"Expected name/longer name or '= expression'")
     return i, tokens
 
 def stat_name_eap(i, tokens):
@@ -347,7 +375,7 @@ def stat(i, tokens):
         i, tokens = star(i, tokens, [(exp_args_back,MATCH_FUNCTION)], 1, 1)
         print("\tDone stat in exp_args_back in stat",i)
         i, tokens = stat_name(i, tokens)
-        print("Done stat_name in stat",i)
+        print("\tDone stat_name in stat",i)
     elif contains(i, tokens, [("(",MATCH_VALUE)]):
         i, tokens = matchValueNow(i, tokens, "(")
         i, tokens = exp(i, tokens)
@@ -654,10 +682,19 @@ def fieldsep(i, tokens):
 # helper function to be able to match a terminal in a list of terminals
 # and if a match succeeded increment i based on the result
 def matchTerminalInList(i, tokens, list):
-    for op in list:
-        if contains(i, tokens, [op]):
-            i, tokens = matchValueNow(i, tokens, op[0])
-            break
+    if contains(i, tokens, list):
+        for op in list:
+            b = match_v(tokens, i, op[0])
+            if b:
+                successOp = op[0]
+                break
+    i_b = i
+    i, tokens = matchValueNow(i, tokens, successOp)
+    success = i != i_b
+    if not success:
+        # syntax error, expected x but got y
+        # consume token anyway
+        i += 1
     return i, tokens
 
 # helper function that immediately calls curried match type function
